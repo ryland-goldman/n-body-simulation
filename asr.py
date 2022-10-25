@@ -25,7 +25,7 @@ import time # sleep function
 # constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
 G = 1e-5  # gravitational constant
 k = 1e-4 # coulumb constant
-E = 1e-4 # softening constant
+E = 1 # softening constant
  
 # particles
 particles = []
@@ -59,7 +59,10 @@ def particle_interaction(p1,p2):
    
     # calculate angles
     alpha = math.asin(dy/r)
-    beta = math.atan(dx/dz)
+    if dz == 0:
+        beta = math.pi
+    else:
+         beta = math.atan(dx/(dz+0.001))
 
     if dx < 0: alpha = -alpha - math.pi
  
@@ -71,27 +74,29 @@ def particle_interaction(p1,p2):
     return p1
  
 def populate_universe():
-    particles.append(Particle(1, 1, 1, 0, 0, 0, 1, 0))
-    particles.append(Particle(-1,-1,-1,0,0,0,1,0))
+    # again, units don't exist
+    particles.append(Particle(1,1,0,0,0,0,1,0))
+    particles.append(Particle(0,1,0,0,0,0,1,0))
+    particles.append(Particle(1,0,1,0,0,0,1,0))
  
 n = 0 # counter
 # main loop of program
 def main():
     global particles, G, k, n
-    while n<1600: # loop forever i guess, maybe change later (FIX)
+    while n<100: # loop a while i guess, maybe change later
         n = n+1 # increase counter
         for p2 in particles:
             #kick
-            for p1 in particles: # nested for loops suck, find a better way (FIX) - currently is O(n^2), try to improve
+            for p1 in particles:
                 p1 = particle_interaction(p1, p2)
         for p in particles:
             #drift
             p.x = p.x + p.vx
             p.y = p.y + p.vy
             p.z = p.z + p.vz
-        # graphics? (FIX)
  
 populate_universe()
 main()
 for p in particles:
     print(p.__str__())
+# plot afterwards, save to ram or disk?
