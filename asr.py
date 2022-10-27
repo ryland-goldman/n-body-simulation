@@ -1,5 +1,6 @@
 import math # physics is applied mathematics - xkcd.com/435
-import time # sleep function
+import time # sleep
+import matplotlib.pyplot as plt # plotting results
 #
 # n-body physics simulation
 # copyright 2022 ryland goldman, all rights reserved
@@ -23,9 +24,10 @@ import time # sleep function
 #   
  
 # constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
-G = 1e-5  # gravitational constant
-k = 1e-4 # coulumb constant
-E = 1 # softening constant
+G = 1  # gravitational constant
+k = 1 # coulumb constant
+E = 1e-100 # softening constant
+t = 1e-3 # time constant
  
 # particles
 particles = []
@@ -66,37 +68,63 @@ def particle_interaction(p1,p2):
 
     if dx < 0: alpha = -alpha - math.pi
  
-    # convert to component vectors, add
-    p1.vx = p1.vx + acc_p1 * math.cos(alpha) * math.sin(beta)
-    p1.vy = p1.vy + acc_p1 * math.sin(alpha)
-    p1.vz = p1.vz + acc_p1 * math.cos(alpha) * math.cos(beta)
+    # convert to component vectors, multiply by time constant, add
+    p1.vx = p1.vx + acc_p1 * math.cos(alpha) * math.sin(beta) * t
+    p1.vy = p1.vy + acc_p1 * math.sin(alpha) * t
+    p1.vz = p1.vz + acc_p1 * math.cos(alpha) * math.cos(beta) * t
    
     return p1
  
 def populate_universe():
     # again, units don't exist
-    particles.append(Particle(1,1,0,0,0,0,1,0))
-    particles.append(Particle(0,1,0,0,0,0,1,0))
-    particles.append(Particle(1,0,1,0,0,0,1,0))
+    particles.append(Particle(1,5,9,1*t,-2*t,-1*t,1,0))
+    particles.append(Particle(2,6,2,2*t,1*t,0,1,0))
+    particles.append(Particle(3,4,1,-1*t,-1*t,2*t,1,0))
+    particles.append(Particle(4,7,3,-2*t,2*t,2*t,1,0))
+    particles.append(Particle(5,3,8,1*t,2*t,-1*t,1,0))
+    particles.append(Particle(6,8,7,2*t,0,-1*t,1,0))
+    particles.append(Particle(7,2,4,-1*t,1*t,2*t,1,0))
+    particles.append(Particle(8,9,6,-2*t,1*t,0,1,0))
+    particles.append(Particle(9,1,5,1*t,2*t,0,1,0))
  
-n = 0 # counter
+n = 0 # counter n
+m = 0 # counter m
 # main loop of program
 def main():
-    global particles, G, k, n
-    while n<100: # loop a while i guess, maybe change later
-        n = n+1 # increase counter
-        for p2 in particles:
-            #kick
-            for p1 in particles:
-                p1 = particle_interaction(p1, p2)
-        for p in particles:
-            #drift
-            p.x = p.x + p.vx
-            p.y = p.y + p.vy
-            p.z = p.z + p.vz
+    global particles, G, k, n, m
+    while m<1000: # outside loop
+        m = m+1 # increase counter
+        
+        # inside loop (so I'm not updating the graph every iteration, for performace reasons)
+        while n<100:
+            n = n+1 # increase counter
+            for p2 in particles:
+                #kick
+                for p1 in particles:
+                    p1 = particle_interaction(p1, p2)
+            for p in particles:
+                #drift
+                p.x = p.x + p.vx
+                p.y = p.y + p.vy
+                p.z = p.z + p.vz
  
 populate_universe()
 main()
+
+# plot particles on graph
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+allX = []
+allY = []
+allZ = []
+for p in particles:
+    allX.append(p.x);
+    allY.append(p.y);
+    allZ.append(p.z);
+ax.clear()
+ax.scatter3D(allX, allY, allZ)
+plt.show()
+        
 for p in particles:
     print(p.__str__())
 # plot afterwards, save to ram or disk?
