@@ -21,13 +21,20 @@ import matplotlib.pyplot as plt # plotting results
 # version 0.2.0 - 26 sept 2022
 #   trig works (it was the arcsin function's fault)
 #   to do: add collisions
-#   
+#
+# version 0.3.0 - 27 oct 2022
+#   added time constant, decreased E
+#   3d plotting enabled (matplotlib) for end result
+#
+# version 0.3.1 - 31 oct 2022
+#   squished some bugs, it works now (more details in notebook)
+#
  
 # constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
 G = 1  # gravitational constant
 k = 1 # coulumb constant
 E = 1e-100 # softening constant
-t = 1e-3 # time constant
+t = 1e-10 # time constant
  
 # particles
 particles = []
@@ -88,25 +95,20 @@ def populate_universe():
     particles.append(Particle(9,1,5,1*t,2*t,0,1,0))
  
 n = 0 # counter n
-m = 0 # counter m
 # main loop of program
 def main():
-    global particles, G, k, n, m
-    while m<1000: # outside loop
-        m = m+1 # increase counter
-        
-        # inside loop (so I'm not updating the graph every iteration, for performace reasons)
-        while n<100:
-            n = n+1 # increase counter
-            for p2 in particles:
-                #kick
-                for p1 in particles:
-                    p1 = particle_interaction(p1, p2)
-            for p in particles:
-                #drift
-                p.x = p.x + p.vx
-                p.y = p.y + p.vy
-                p.z = p.z + p.vz
+    global particles, G, k, n
+    while n<10000: # outside loop
+        n = n+1 # increase counter
+        for p2 in particles:
+            #kick
+            for p1 in particles:
+                p1 = particle_interaction(p1, p2)
+        for p in particles:
+            #drift
+            p.x = p.x + p.vx
+            p.y = p.y + p.vy
+            p.z = p.z + p.vz
  
 populate_universe()
 main()
@@ -124,7 +126,8 @@ for p in particles:
 ax.clear()
 ax.scatter3D(allX, allY, allZ)
 plt.show()
+
         
 for p in particles:
-    print(p.__str__())
+    p.__str__()
 # plot afterwards, save to ram or disk?
