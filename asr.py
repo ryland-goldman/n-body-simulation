@@ -1,6 +1,7 @@
 import math # physics is applied mathematics - xkcd.com/435
 import time # sleep
 import matplotlib.pyplot as plt # plotting results
+import os # for ffmpeg
 #
 # n-body physics simulation
 # copyright 2022 ryland goldman, all rights reserved
@@ -29,12 +30,15 @@ import matplotlib.pyplot as plt # plotting results
 # version 0.3.1 - 31 oct 2022
 #   squished some bugs, it works now (more details in notebook)
 #
+# version 0.3.2 - 2 nov 2022
+#   changed 3d plotting
+#
  
 # constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
-G = 1  # gravitational constant
+G = 6.7e-11  # gravitational constant
 k = 1 # coulumb constant
 E = 1e-100 # softening constant
-t = 1e-10 # time constant
+t = 1e-7 # time constant
  
 # particles
 particles = []
@@ -84,21 +88,26 @@ def particle_interaction(p1,p2):
  
 def populate_universe():
     # again, units don't exist
-    particles.append(Particle(1,5,9,1*t,-2*t,-1*t,1,0))
-    particles.append(Particle(2,6,2,2*t,1*t,0,1,0))
-    particles.append(Particle(3,4,1,-1*t,-1*t,2*t,1,0))
-    particles.append(Particle(4,7,3,-2*t,2*t,2*t,1,0))
-    particles.append(Particle(5,3,8,1*t,2*t,-1*t,1,0))
-    particles.append(Particle(6,8,7,2*t,0,-1*t,1,0))
-    particles.append(Particle(7,2,4,-1*t,1*t,2*t,1,0))
-    particles.append(Particle(8,9,6,-2*t,1*t,0,1,0))
-    particles.append(Particle(9,1,5,1*t,2*t,0,1,0))
+    '''
+    particles.append(Particle(1,5,9,1*t,-2*t,-1*t,1e10,0))
+    particles.append(Particle(2,6,2,2*t,1*t,0,1e3,0))
+    particles.append(Particle(3,4,1,-1*t,-1*t,2*t,1e5,0))
+    particles.append(Particle(4,7,3,-2*t,2*t,2*t,1e8,0))
+    particles.append(Particle(5,3,8,1*t,2*t,-1*t,1e7,0))
+    particles.append(Particle(6,8,7,2*t,0,-1*t,1e8,0))
+    particles.append(Particle(7,2,4,-1*t,1*t,2*t,1e2,0))
+    particles.append(Particle(8,9,6,-2*t,1*t,0,1e9,0))
+    particles.append(Particle(9,1,5,1*t,2*t,0,1e10,0))'''
+    particles.append(Particle(0,0,0,0,0,0,2e30,0))
+    particles.append(Particle(1.5e11,0,0,0,0,1e7*t,6e24,0))
  
 n = 0 # counter n
 # main loop of program
 def main():
     global particles, G, k, n
-    while n<10000: # outside loop
+    while n<50000: # outside loop
+        if n%100 == 0:
+            plot_particles(int(n/100))
         n = n+1 # increase counter
         for p2 in particles:
             #kick
@@ -109,25 +118,29 @@ def main():
             p.x = p.x + p.vx
             p.y = p.y + p.vy
             p.z = p.z + p.vz
- 
-populate_universe()
-main()
+
 
 # plot particles on graph
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-allX = []
-allY = []
-allZ = []
-for p in particles:
-    allX.append(p.x);
-    allY.append(p.y);
-    allZ.append(p.z);
-ax.clear()
-ax.scatter3D(allX, allY, allZ)
-plt.show()
+def plot_particles(itr_num):
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    allX = []
+    allY = []
+    allZ = []
+    for p in particles:
+        allX.append(p.x);
+        allY.append(p.y);
+        allZ.append(p.z);
+    ax.clear()
+    ax.scatter3D(allX, allY, allZ)
+    plt.savefig('/Users/rylandgoldman/Desktop/NbodySim/frame-'+str(itr_num)+'.png')
+    plt.close()
 
-        
-for p in particles:
-    p.__str__()
-# plot afterwards, save to ram or disk?
+populate_universe()
+main()
+plot_particles("end")
+
+print("Simulation completed. Starting postprocessing...")
+os.system("ffmpeg -f image2 -r 30 -i /Users/rylandgoldman/Desktop/NbodySim/frame-%01d.png -vcodec mpeg4 -y /Users/rylandgoldman/Desktop/NbodySim/video.mp4")#
+# os.system("open /Users/rylandgoldman/Desktop/NbodySim/video.mp4")
+print("Postprocessing completed. Check your desktop for the animation.")
