@@ -1,5 +1,6 @@
 import math # physics is applied mathematics - xkcd.com/435
 import time # timer
+import os # post processing
 from random import randint # random initial conditions
 #
 # n-body physics simulation
@@ -44,6 +45,10 @@ from random import randint # random initial conditions
 #
 # version 0.5.0 - 15 nov 2022
 #   collisions! - they're elastic
+#
+# version 0.5.1 - 30 nov 2022
+#   windows
+#
  
 # constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
 G = 1  # gravitational constant
@@ -54,8 +59,8 @@ s = 1 # size constant
  
 # initial conditions
 particles = []
-iterations = 1e5 # iterations of simulation
-frequency = 1e3 # frequency of recording frames
+iterations = 5e4 # iterations of simulation
+frequency = 1e2 # frequency of recording frames
  
 # structure of a particle has position, velocity, mass, and charge
 class Particle:
@@ -141,9 +146,9 @@ n = 0 # counter n
 # main loop of program
 def main():
     global particles, G, k, n
-    file = open("/Users/rylandgoldman/Desktop/NbodySim/script.py","a") # open postprocessing script for appending
-    f_tmp = open("/Users/rylandgoldman/Desktop/NbodySim/script.py","w") # temporary file
-    f_tmp.writelines('''import matplotlib as mp\nmp.use("TkAgg")\nimport matplotlib.pyplot as plt\nparticles=[]\ndef plot_particles(itr_num, pList):\n\tfig = plt.figure()\n\tax = fig.add_subplot(projection='3d')\n\tallX = []\n\tallY = []\n\tallZ = []\n\tfor p in pList:\n\t\tallX.append(p.x);\n\t\tallY.append(p.y);\n\t\tallZ.append(p.z);\n\tax.clear()\n\tax.scatter3D(allX, allY, allZ)\n\tplt.savefig('/Volumes/RAMDisk/frame-'+str(itr_num)+'.png')\n\tax.clear()\n\tplt.close(fig)\n''')
+    file = open("C:\\Nbody\\script.py","a") # open postprocessing script for appending
+    f_tmp = open("C:\\Nbody\\script.py","w") # temporary file
+    f_tmp.writelines('''import matplotlib as mp\nmp.use("TkAgg")\nimport matplotlib.pyplot as plt\nparticles=[]\ndef plot_particles(itr_num, pList):\n\tfig = plt.figure()\n\tax = fig.add_subplot(projection='3d')\n\tallX = []\n\tallY = []\n\tallZ = []\n\tfor p in pList:\n\t\tallX.append(p.x);\n\t\tallY.append(p.y);\n\t\tallZ.append(p.z);\n\tax.clear()\n\tax.scatter3D(allX, allY, allZ)\n\tplt.savefig('C:\\\\Nbody\\\\frame-'+str(itr_num)+'.png')\n\tax.clear()\n\tplt.close(fig)\n''')
     f_tmp.close()
     file.write("class Particle:\n\tdef __init__(self,x,y,z,vx,vy,vz,m,q):\n\t\tself.x = x\n\t\tself.y = y\n\t\tself.z = z\n\t\tself.vx = vx\n\t\tself.vy = vy\n\t\tself.vz = vz\n\t\tself.m = m\n\t\tself.q = q\n")
     while n<iterations: # outside loop
@@ -181,14 +186,13 @@ endtime = time.time()
 print("Processing done in ",endtime-starttime," seconds")
 
 print("Simulation completed. Preparing postprocessing...")
-fcmd = open("/Users/rylandgoldman/Desktop/Nbody.sh","w")
+os.system("python3 C:\\Nbody\\script.py")
 if iterations/frequency > 2500:
-    fcmd.write("diskutil erasevolume HFS+ 'RAMDisk' `hdiutil attach -nomount ram://1048576`\npython3 /Users/rylandgoldman/Desktop/NbodySim/script.py\nffmpeg -f image2 -r 60 -i /Volumes/RAMDisk/frame-%01d.png -vcodec mpeg4 -y /Users/rylandgoldman/Desktop/NbodySim/video.mp4\nopen /Users/rylandgoldman/Desktop/NbodySim/video.mp4\nrm /Volumes/RAMDisk/*.png\nrm /Users/rylandgoldman/Desktop/NbodySim/script.py\ndiskutil eject /Volumes/RAMDisk")
+    os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 60 -i C:\\Nbody\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")        
 elif iterations/frequency > 500:
-    fcmd.write("diskutil erasevolume HFS+ 'RAMDisk' `hdiutil attach -nomount ram://1048576`\npython3 /Users/rylandgoldman/Desktop/NbodySim/script.py\nffmpeg -f image2 -r 30 -i /Volumes/RAMDisk/frame-%01d.png -vcodec mpeg4 -y /Users/rylandgoldman/Desktop/NbodySim/video.mp4\nopen /Users/rylandgoldman/Desktop/NbodySim/video.mp4\nrm /Volumes/RAMDisk/*.png\nrm /Users/rylandgoldman/Desktop/NbodySim/script.py\ndiskutil eject /Volumes/RAMDisk")
+    os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 30 -i C:\\Nbody\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
 elif iterations/frequency > 100:
-    fcmd.write("diskutil erasevolume HFS+ 'RAMDisk' `hdiutil attach -nomount ram://1048576`\npython3 /Users/rylandgoldman/Desktop/NbodySim/script.py\nffmpeg -f image2 -r 20 -i /Volumes/RAMDisk/frame-%01d.png -vcodec mpeg4 -y /Users/rylandgoldman/Desktop/NbodySim/video.mp4\nopen /Users/rylandgoldman/Desktop/NbodySim/video.mp4\nrm /Volumes/RAMDisk/*.png\nrm /Users/rylandgoldman/Desktop/NbodySim/script.py\ndiskutil eject /Volumes/RAMDisk")
+    os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 20 -i C:\\Nbody\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
 else:
-    fcmd.write("diskutil erasevolume HFS+ 'RAMDisk' `hdiutil attach -nomount ram://1048576`\npython3 /Users/rylandgoldman/Desktop/NbodySim/script.py\nffmpeg -f image2 -r 10 -i /Volumes/RAMDisk/frame-%01d.png -vcodec mpeg4 -y /Users/rylandgoldman/Desktop/NbodySim/video.mp4\nopen /Users/rylandgoldman/Desktop/NbodySim/video.mp4\nrm /Volumes/RAMDisk/*.png\nrm /Users/rylandgoldman/Desktop/NbodySim/script.py\ndiskutil eject /Volumes/RAMDisk")
-fcmd.close()
-print("Postprocessing ready. Check your desktop!")
+    os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 10 -i C:\\Nbody\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+print("Postprocessing completed!")
