@@ -24,7 +24,7 @@ I'm beginning to write the program using the NumPy library. Because `NumPy.vecto
 
 ### 2 December 2022
 
-No changes to the program today, but I worked to learn more about the Python `NumPy` library.
+No changes to the program today, but I worked to learn more about the Python `NumPy` library, using these sources: [1](https://www.w3schools.com/python/numpy/numpy_ufunc_create_function.asp), [2](https://stackoverflow.com/questions/6768245/difference-between-frompyfunc-and-vectorize-in-numpy), [3](https://docs.scipy.org/doc/numpy-1.14.0/reference/generated/numpy.frompyfunc.html#numpy.frompyfunc), [4](https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html), [5](https://stackoverflow.com/questions/22981845/3-dimensional-array-in-numpy)
 
 ### 30 November 2022
 
