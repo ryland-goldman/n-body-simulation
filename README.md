@@ -1,6 +1,7 @@
 # Using CUDA to Increase the Accuracy and Performance of Particle-Particle N-Body Simulations
 
 2022-23 Synopsys Research Project
+
 [Ryland Goldman](https://www.rylandgoldman.com/) • Los Gatos High School
 
 ---
