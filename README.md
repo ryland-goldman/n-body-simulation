@@ -37,3 +37,7 @@ I did not work on the project today. Instead, I worked on the presentation for m
 Today, I implemented support for collisions to the *N*-body simulation. The formula I used was `p1.vx = (p1vx*(p1.m-p2.m)+2*p2.m*p2vx)/(p1.m+p2.m)`. After calculating the collision, it pushes the particles apart until they are out of bounds of each other. I also changed the calculation of angle `alpha` in case `r` is sufficiently close to zero to cause a `ValueError`. See commit [fc172b5](https://github.com/ryland-goldman/n-body-simulation/commit/fc172b563e47ef51fa328915a714cb578c263323).
 
 I also tested the performance of a simulation with `1e5` iterations, `1e3` frequency, and 20 randomly-generated particles. The compute times were 68.468 seconds, 67.083 seconds, 68.791 seconds, 66.789 seconds, and 66.561 seconds, with a standard deviation of 1.019 and standard error of the mean of 0.456.
+
+### 17 November 2022
+
+Today, I worked on my [Journal Write Up 4](https://docs.google.com/document/d/1SawG_NuJS8U4WbnQP5wHD6LZce_LIKmVna33sIwBS9w/edit#) and filled out this week's Friday Reflection.
