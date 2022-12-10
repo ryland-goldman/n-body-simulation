@@ -28,6 +28,8 @@ I worked for a few hours this morning to try and make some progress with NumPy. 
 
 I'm continuing to convert the program to NumPy. Today, I worked to define the `ParticleIntrNV` function, which is converted to a vectorized function `ParticleIntr` using `np.vectorize()`. The `ParticleIntr` function takes an input of two particles, and calculates the forces between them using the distance formula, Newton's Law of Gravitation, Coulomb's Law, and trigonometry. See commit [bc5e20b](https://github.com/ryland-goldman/n-body-simulation/commit/bc5e20b362caf26f45be8b9451590a631835d4fd).
 
+---
+
 ### 6 December 2022
 
 **Goals**: 1) Rewrite program using NumPy library
@@ -51,6 +53,8 @@ I installed `Python 3.10.7`, `CuPy 11.3.0`, `Nvidia CUDA Toolkit 11.8`, `FFmpeg`
 **Goals**: 1) Start status update presentation, 2) discuss notebook problems
 
 I did not work on the project today. Instead, I worked on the presentation for my [4th status update](https://docs.google.com/presentation/d/1wuFTqlnsiTqC-TL3KJPcNL920kxUsa2ucYBVUHMBNU4/edit). I also discussed changes I could make to my [notebook](https://docs.google.com/document/d/1xeX6B97Fp9gwmoVqsXZ3Tb4dAV37uFZeaSvDWccRUDs/edit#) for the next notebook check on 2022-12-06.
+
+---
 
 ### 21 November 2022
 
