@@ -10,6 +10,10 @@
 
 An N-body simulation is a simulated universe involving bodies either on a macro scale (i.e. planetary) or a micro scale (i.e. atomic). Bodies interact with each other with forces such as gravity. While most optimizations of N-body simulations involve particle-cluster interactions (such as the Barnes-Hut algorithm), this project is unique because it focuses on the more accurate direct particle-particle interactions. As such calculations take lots of CPU time, this project will be using parallelization with a graphics processing unit (GPU). In addition, accuracy can be improved on an atomic and astronomical scale by incorporating electromagnetic forces in addition to gravitational ones.
 
+### Flowchart
+
+![Flowchart](https://www.rylandgoldman.com/files/asr/Flowchart.png)
+
 ## Daily Goals
 
 ### 10 December 2022
