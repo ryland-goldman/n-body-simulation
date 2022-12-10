@@ -1,4 +1,4 @@
-# Using CUDA to Increase the Accuracy and Performance of Particle-Particle N-Body Simulations
+# Using CUDA to Increase the Accuracy and Performance of Particle-Particle *N*-Body Simulations
 
 2022-23 Synopsys Research Project
 
@@ -8,7 +8,13 @@
 
 ## Project Background
 
-An N-body simulation is a simulated universe involving bodies either on a macro scale (i.e. planetary) or a micro scale (i.e. atomic). Bodies interact with each other with forces such as gravity. While most optimizations of N-body simulations involve particle-cluster interactions (such as the Barnes-Hut algorithm), this project is unique because it focuses on the more accurate direct particle-particle interactions. As such calculations take lots of CPU time, this project will be using parallelization with a graphics processing unit (GPU). In addition, accuracy can be improved on an atomic and astronomical scale by incorporating electromagnetic forces in addition to gravitational ones.
+An *N*-body simulation is a simulated universe involving bodies either on a macro scale (i.e. planetary) or a micro scale (i.e. atomic). Bodies interact with each other with forces such as gravity. While most optimizations of *N*-body simulations involve particle-cluster interactions (such as the Barnes-Hut algorithm), this project is unique because it focuses on the more accurate direct particle-particle interactions. As such calculations take lots of CPU time, this project will be using parallelization with a graphics processing unit (GPU). In addition, accuracy can be improved on an atomic and astronomical scale by incorporating electromagnetic forces in addition to gravitational ones.
+
+My goal is to create a more efficient and accurate method for an *N*-body simulation using CUDA with a GPU.
+
+The control in this experiment is the processing time of an Intel CPU (12600K model), and the experimental group will be an Nvidia GPU (3090 model). The dependent variable is the amount of time it takes to complete each step in the simulation. The independent variables are the number of threads used (10,496 with GPU and 16 with CPU) and the number of particles simulated.
+
+This experiment is mostly limited in two ways: first, since computer components are expensive, I only have one. I will not be able to test multi-GPU or multi-CPU setups. I’m also limited in the amount of random access memory (RAM). The computer I will be using has 24 GB of Video RAM for the GPU and 32 GB which can be allocated between the CPU and GPU, minus the RAM used for system operation. Less RAM means a smaller number of particles can be used.
 
 ### Flowchart
 
