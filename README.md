@@ -20,6 +20,10 @@ This experiment is mostly limited in two ways: first, since computer components 
 
 ![Flowchart](https://www.rylandgoldman.com/files/asr/Flowchart.png)
 
+### Example Output
+
+https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-a3a8-1acc370b57a1.mp4
+
 ## Daily Progress and Goals
 
 ### 10 December 2022
