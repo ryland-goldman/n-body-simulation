@@ -12,6 +12,10 @@ An N-body simulation is a simulated universe involving bodies either on a macro 
 
 ## Daily Goals
 
+### 10 December 2022
+
+I worked for a few hours this morning to try and make some progress with NumPy. The original `ParticleIntr` function has now been broken up into `getForce`  (to calculate the gross acceleration) and three other functions (to convert it into x, y, and z components). All four are vectorized. The data is stored in eight separate arrays, due to the way `np.vectorize()` seems to work. The end result appears to parallel the original simulation. The next step is to store the results for the video animation. See commit [e795856](https://github.com/ryland-goldman/n-body-simulation/commit/e7958561f316bc9bd9fa125b10272ed93b961124).
+
 ### 8 December 2022
 
 I'm continuing to convert the program to NumPy. Today, I worked to define the `ParticleIntrNV` function, which is converted to a vectorized function `ParticleIntr` using `np.vectorize()`. The `ParticleIntr` function takes an input of two particles, and calculates the forces between them using the distance formula, Newton's Law of Gravitation, Coulomb's Law, and trigonometry. See commit [bc5e20b](https://github.com/ryland-goldman/n-body-simulation/commit/bc5e20b362caf26f45be8b9451590a631835d4fd).
