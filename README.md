@@ -14,38 +14,54 @@ An N-body simulation is a simulated universe involving bodies either on a macro 
 
 ![Flowchart](https://www.rylandgoldman.com/files/asr/Flowchart.png)
 
-## Daily Goals
+## Daily Progress and Goals
 
 ### 10 December 2022
+
+**Goals**: 1) Rewrite program using NumPy library
 
 I worked for a few hours this morning to try and make some progress with NumPy. The original `ParticleIntr` function has now been broken up into `getForce`  (to calculate the gross acceleration) and three other functions (to convert it into x, y, and z components). All four are vectorized. The data is stored in eight separate arrays, due to the way `np.vectorize()` seems to work. The end result appears to parallel the original simulation. The next step is to store the results for the video animation. See commit [e795856](https://github.com/ryland-goldman/n-body-simulation/commit/e7958561f316bc9bd9fa125b10272ed93b961124).
 
 ### 8 December 2022
 
+**Goals**: 1) Rewrite program using NumPy library
+
 I'm continuing to convert the program to NumPy. Today, I worked to define the `ParticleIntrNV` function, which is converted to a vectorized function `ParticleIntr` using `np.vectorize()`. The `ParticleIntr` function takes an input of two particles, and calculates the forces between them using the distance formula, Newton's Law of Gravitation, Coulomb's Law, and trigonometry. See commit [bc5e20b](https://github.com/ryland-goldman/n-body-simulation/commit/bc5e20b362caf26f45be8b9451590a631835d4fd).
 
 ### 6 December 2022
+
+**Goals**: 1) Rewrite program using NumPy library
 
 I'm beginning to write the program using the NumPy library. Because `NumPy.vectorize` and `NumPy.frompyfuunc` require simple mathematical operations, it will make it easier to be converted into a CUDA kernel or OpenCL kernel later. I'm keeping the constants the same as before, and storing particles in a 2D array, with the second dimension storing the eight datapoints of the particles. See commit [ab0edfa](https://github.com/ryland-goldman/n-body-simulation/commit/ab0edfac793db095024de6adbf1ab36bc50d4880).
 
 ### 2 December 2022
 
+**Goals**: 1) Review NumPy tutorials to rewrite program using NumPy library, 2) fill out Friday reflection for 2/12
+
 No changes to the program today, but I worked to learn more about the Python `NumPy` library, using these sources: [1](https://www.w3schools.com/python/numpy/numpy_ufunc_create_function.asp), [2](https://stackoverflow.com/questions/6768245/difference-between-frompyfunc-and-vectorize-in-numpy), [3](https://docs.scipy.org/doc/numpy-1.14.0/reference/generated/numpy.frompyfunc.html#numpy.frompyfunc), [4](https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html), [5](https://stackoverflow.com/questions/22981845/3-dimensional-array-in-numpy)
 
 ### 30 November 2022
+
+**Goals**: 1) Set up PC and install libraries
 
 I installed `Python 3.10.7`, `CuPy 11.3.0`, `Nvidia CUDA Toolkit 11.8`, `FFmpeg`, and `Matplotlib 3.6.2`, plus all necessary dependencies, onto my computer. I updated the code to run on a PC, for example by changing the shell script to parse the data with `Matplotlib`. The directories also needed to be updated from `/Users/rylandgoldman/...` to `C:\Nbody\...`, because of the Windows filesystem. See commit [4f71716](https://github.com/ryland-goldman/n-body-simulation/commit/4f71716a726795549b7a20c5313d2a4da88dc988).
 
 ### 28 November 2022
 
+**Goals**: 1) Start status update presentation, 2) discuss notebook problems
+
 I did not work on the project today. Instead, I worked on the presentation for my [4th status update](https://docs.google.com/presentation/d/1wuFTqlnsiTqC-TL3KJPcNL920kxUsa2ucYBVUHMBNU4/edit). I also discussed changes I could make to my [notebook](https://docs.google.com/document/d/1xeX6B97Fp9gwmoVqsXZ3Tb4dAV37uFZeaSvDWccRUDs/edit#) for the next notebook check on 2022-12-06.
 
 ### 21 November 2022
+
+**Goals**: 1) Work more on collisions, 2) Measure performance
 
 Today, I implemented support for collisions to the *N*-body simulation. The formula I used was `p1.vx = (p1vx*(p1.m-p2.m)+2*p2.m*p2vx)/(p1.m+p2.m)`. After calculating the collision, it pushes the particles apart until they are out of bounds of each other. I also changed the calculation of angle `alpha` in case `r` is sufficiently close to zero to cause a `ValueError`. See commit [fc172b5](https://github.com/ryland-goldman/n-body-simulation/commit/fc172b563e47ef51fa328915a714cb578c263323).
 
 I also tested the performance of a simulation with `1e5` iterations, `1e3` frequency, and 20 randomly-generated particles. The compute times were 68.468 seconds, 67.083 seconds, 68.791 seconds, 66.789 seconds, and 66.561 seconds, with a standard deviation of 1.019 and standard error of the mean of 0.456.
 
 ### 17 November 2022
+
+**Goals**: 1) Fill out Friday Reflection for 17/11, 2) complete journal write up #4
 
 Today, I worked on my [Journal Write Up 4](https://docs.google.com/document/d/1SawG_NuJS8U4WbnQP5wHD6LZce_LIKmVna33sIwBS9w/edit#) and filled out this week's Friday Reflection.
