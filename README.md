@@ -26,6 +26,12 @@ https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-
 
 ## Daily Progress and Goals
 
+### 12 December 2022
+
+**Goals**: 1) Add animation to program.
+
+Today, I defined the `create_video` function, which takes an input of a list of frames, where each frame is a second list of coordinates, and uses `Matplotlib` to save a 3D graph to `C:\Nbody\files`. The frames are all strung together using `FFmpeg`, and the frame rate is determined by the ratio of iterations to frequency. The images are all removed afterwards, and the video is stored at `C:\Nbody\video.mp4`.
+
 ### 10 December 2022
 
 **Goals**: 1) Rewrite program using NumPy library
