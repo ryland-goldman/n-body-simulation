@@ -39,6 +39,9 @@
 # program.                                                           
 
 import numpy as np
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import os
 import math
 
 # constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
@@ -50,7 +53,7 @@ p = 10     # particles
  
 # initial conditions
 iterations = int(1000) # iterations of simulation
-frequency = 1e2      # frequency of recording frames
+frequency  = int(10)  # frequency of recording frames
 
 # data storage, numpy arrays for each of the eight data points
 px = np.random.rand(p)    # x, y, z coordinates
@@ -61,6 +64,7 @@ pvy = np.random.rand(p)*t # component velocities: x, y, z
 pvz = np.random.rand(p)*t # component velocities: x, y, z
 pq = np.random.rand(p)    # charge
 pm = np.random.rand(p)    # mass
+end_process = []          # list to store data which will be processed at the end
 
 # function to calculate the gross acceleration of one particle from another, given the properties of each
 # p1x, p1y, p1z    - x, y, and z coordinates of particle 1
@@ -136,6 +140,9 @@ zcomp    = np.vectorize(zcompNV)
 def main():
     global px, py, pz, pvx, pvy, pvz, pq, pm # global variables
     for n in range(iterations):
+        if n % frequency == 0:
+            end_process.append([n, px.tolist(), py.tolist(), pz.tolist()])
+        
         for cp in range(p): # calculate forces on each particle
             forces = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # get acceleration
             chg_vx = xcomp(forces, px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # change in x velocity
@@ -151,3 +158,36 @@ def main():
         px += pvx
         py += pvy
         pz += pvz
+
+# function to convert a 2D array into a video animation
+# frames - 2D array, with the first dimension representing individual frames, and the second dimension containing a counter and lists of x, y, and z coordinates
+def create_video(frames):
+    mp.use("TkAgg") # set backend of matplotlib to Tkinter
+    counter = 0     # create a counter
+    for frame in frames:   # loop through each frame in list
+        fig = plt.figure() # create a new plot
+        ax = fig.add_subplot(projection='3d')    # new 3D plot
+        ax.clear()         # clear plot
+        ax.scatter3D(frame[1],frame[2],frame[3]) # add x, y, and z axes
+        plt.savefig('C:\\Nbody\\files\\frame-'+str(counter)+'.png') # save image in C:\Nbody
+        ax.clear()         # clear plot
+        plt.close(fig)     # close plot
+        counter = counter + 1 # increment counter
+
+    # use FFmpeg to generate a video, switching the frame rate based on the number of frames
+    if iterations/frequency > 2500:
+        os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 60 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+    if iterations/frequency > 500:
+        os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 30 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+    if iterations/frequency > 100:
+        os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 20 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+    else:
+        os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 10 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+
+    # remove all files in directory
+    filelist = [ f for f in os.listdir("C:\\Nbody\\files\\") if f.endswith(".png") ]
+    for f in filelist:
+        os.remove(os.path.join("C:\\Nbody\\files\\", f))
+        
+main()                    # run program
+create_video(end_process) # create animation
