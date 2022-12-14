@@ -43,6 +43,7 @@ import matplotlib as mp
 import matplotlib.pyplot as plt
 import os
 import math
+import time
 
 # constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
 G = 1      # gravitational constant
@@ -52,8 +53,8 @@ t = 1e-7   # time constant
 p = 10     # particles
  
 # initial conditions
-iterations = int(1000) # iterations of simulation
-frequency  = int(10)  # frequency of recording frames
+iterations = int(1e4) # iterations of simulation
+frequency  = int(5e2)  # frequency of recording frames
 
 # data storage, numpy arrays for each of the eight data points
 px = np.random.rand(p)    # x, y, z coordinates
@@ -188,6 +189,14 @@ def create_video(frames):
     filelist = [ f for f in os.listdir("C:\\Nbody\\files\\") if f.endswith(".png") ]
     for f in filelist:
         os.remove(os.path.join("C:\\Nbody\\files\\", f))
-        
-main()                    # run program
-create_video(end_process) # create animation
+
+start_time = time.time()    # start of program
+main()                      # run program
+midpoint_time = time.time() # runtime of program, exluding animation
+create_video(end_process)   # create animation
+end_time = time.time()      # runtime of program, including animation
+
+print("Program has completed running.")
+print("Time to run N-body simulation: ",math.floor((midpoint_time-start_time)*100)/100," seconds")
+print("Time to create animation:      ",math.floor((end_time-midpoint_time)*100)/100," seconds")
+print("Total time:                    ",math.floor((end_time-start_time)*100)/100," seconds")
