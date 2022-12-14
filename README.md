@@ -31,11 +31,13 @@ https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-
 **Goals**: 1) 
 
 I modified the end of the program to store three timestamps, the start of the run, the point when the simulation ends, and the point when processing ends. Then, the runtime is printed out to the Python CLI. I ran five trials with each program, setting the initial conditions to the following:
+
 - `Iterations = 1e4`
 - `Frequency = 5e2`
 - `Particles = 10`
 - `Time constant = 1e-7`
-From the five trials performed, the performance with NumPy was 28.566±0.47 seconds, and the performance without was 1.126±0.005 seconds. The error bars represent twice the standard error of the mean, and do not overlap, so the data is significant. Unexpectedly, the NumPy library slowed down the performance a lot. Something in the new program is not functioning correctly, and requires debugging before moving on to adding the CuPy library which supports CUDA.
+- 
+From the five trials performed, the performance with NumPy was 28.566±0.47 seconds, and the performance without was 1.126±0.005 seconds. The error bars represent twice the standard error of the mean, and do not overlap, so the data is significant. Unexpectedly, the NumPy library slowed down the performance a lot. Something in the new program is not functioning correctly, and requires debugging before moving on to adding the CuPy library which supports CUDA. See commit [242a687](https://github.com/ryland-goldman/n-body-simulation/commit/242a687afbf6c9f623e251657cd14da2c9a00862).
 
 ![Screenshot 2022-12-14 140828](https://user-images.githubusercontent.com/48637662/207725687-3363cdd6-52df-4d41-8bd0-3ec25f5fd53b.png)
 
