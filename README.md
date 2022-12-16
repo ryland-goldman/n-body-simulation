@@ -26,9 +26,15 @@ https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-
 
 ## Daily Progress and Goals
 
+### 16 December 2022
+
+**Goals**: 1) Fix slow performance of `NumPy` simulation
+
+I optimized the computation of forces in two ways. First, I switched from using `np.vectorize` to using `np.frompyfunc`. The two are mostly equivalent, except for a couple features which are exclusive to `vectorize` (see [here](https://stackoverflow.com/a/11157577)). This brought a modest performance improvement, but for a more significant one, I merged the `getForce`, `xcomp`, `ycomp`, and `zcomp` functions all into one. Therefore, the amount of loops was cut in four, and less time was spent on recomputing data which had already been processed before (such as the angles).
+
 ### 14 December 2022
 
-**Goals**: 1) 
+**Goals**: 1) Test performance of `NumPy` simulation
 
 I modified the end of the program to store three timestamps, the start of the run, the point when the simulation ends, and the point when processing ends. Then, the runtime is printed out to the Python CLI. I ran five trials with each program, setting the initial conditions to the following:
 
