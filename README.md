@@ -30,7 +30,7 @@ https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-
 
 **Goals**: 1) Fix slow performance of `NumPy` simulation
 
-I optimized the computation of forces in two ways. First, I switched from using `np.vectorize` to using `np.frompyfunc`. The two are mostly equivalent, except for a couple features which are exclusive to `vectorize` (see [here](https://stackoverflow.com/a/11157577)). This brought a modest performance improvement, but for a more significant one, I merged the `getForce`, `xcomp`, `ycomp`, and `zcomp` functions all into one. Therefore, the amount of loops was cut in four, and less time was spent on recomputing data which had already been processed before (such as the angles).
+I optimized the computation of forces in two ways. First, I switched from using `np.vectorize` to using `np.frompyfunc`. The two are mostly equivalent, except for a couple features which are exclusive to `vectorize` (see [here](https://stackoverflow.com/a/11157577)). This brought a modest performance improvement, but for a more significant one, I merged the `getForce`, `xcomp`, `ycomp`, and `zcomp` functions all into one. Therefore, the amount of loops was cut in four, and less time was spent on recomputing data which had already been processed before (such as the angles). See commit [09904d7](https://github.com/ryland-goldman/n-body-simulation/commit/09904d7e0aed993361b9fcc00383071fa0b1b0cf).
 
 ### 14 December 2022
 
