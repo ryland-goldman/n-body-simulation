@@ -29,14 +29,7 @@
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-
-# NOTE:
-# When `main` is called, `NumPy.vectorize` throws a RuntimeWarning "invalid value encountered in double_scalars."
-# This warning can be ignored. It is the result of calling `math.asin(dy/r)` when r is zero, which would cause a
-# ZeroDivisionError if the function was not vectorized. Due to the use of `NumPy.where`, it doesn't affect the
-# program.                                                           
+# SOFTWARE.                                       
 
 import numpy as np
 import matplotlib as mp
@@ -67,7 +60,8 @@ pq = np.random.rand(p)    # charge
 pm = np.random.rand(p)    # mass
 end_process = []          # list to store data which will be processed at the end
 
-# function to calculate the gross acceleration of one particle from another, given the properties of each
+# function to calculate the acceleration of one particle on another given the distance, mass, and charge
+# returns a tuple of the component forces, in the format of (x,y,z)
 # p1x, p1y, p1z    - x, y, and z coordinates of particle 1
 # p1vx, p1vy, p1vz - x, y, and z component velocities of particle 1
 # p2x, p2y, p2z    - x, y, and z coordinates of particle 2
@@ -77,65 +71,27 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
     dz = p1z-p2z
-    r = math.sqrt( dx**2 + dy**2 + dz**2 ) # distance formula
-    return t*(( # multiply by time constant
+    r = math.sqrt( dx**2 + dy**2 + dz**2 ) + E # distance formula
+
+    # calculate force
+    f = t*(( # multiply by time constant
         np.where(
             (p1x == p2x) & (p1y == p2y) & (p1z == p2z), 0.0, # if the particles are the same, then there is no force between them to be calculated
-            (G*p1m*p2m)/((r+E)**2) - (k*p1q*p2q)/((r+E)**2)) # otherwise, use newton's law of universal gravitation, and coulomb's law (subtraction because opposites attract, like charges repel)
+            (G*p1m*p2m)/((r)**2) - (k*p1q*p2q)/((r)**2))     # otherwise, use newton's law of universal gravitation, and coulomb's law (subtraction because opposites attract, like charges repel)
         )*1.0)/p1m # divide by mass because of newton's 2nd law, so technically it's returning acceleration, not mass
 
-# function to calculate the change in velocity in the x direction
-# f                - acceleration provided by getForce function
-# p1x, p1y, p1z    - x, y, and z coordinates of particle 1
-# p1vx, p1vy, p1vz - x, y, and z component velocities of particle 1
-# p2x, p2y, p2z    - x, y, and z coordinates of particle 2
-# p1m, p2m         - masses of particles 1 and 2
-# p1q, p2q         - charges of particles 1 and 2
-def xcompNV(f, p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q):
-    dx = p1x-p2x # distances between particles in each direction
-    dy = p1y-p2y
-    dz = p1z-p2z
-    r = math.sqrt( dx**2 + dy**2 + dz**2 ) # distance formula
-    alpha = (np.where(dx < 0, -math.asin(dy/r), math.asin(dy/r)))*1.0 # see https://bit.ly/3Hq4s7v - the angle is negative if the x value moves in the negative direction
-    beta = (np.where(dz == 0, math.pi, math.atan(dx/dz)))*1.0         # see https://bit.ly/3Hq4s7v - the angle is pi if there is no change in z
-    return np.where(f==0, 0, f*math.cos(alpha)*math.sin(beta))*1.0    # see https://bit.ly/3Hq4s7v - if force is zero, no change in x
+    # calculate angles - see https://bit.ly/3Hq4s7v
+    alpha = (np.where(dx < 0, -math.asin(dy/r), math.asin(dy/r)))*1.0 # the angle is negative if the x value moves in the negative direction
+    beta = (np.where(dz == 0, math.pi, math.atan(dx/(dz+E))))*1.0     # the angle is pi if there is no change in z
 
-# function to calculate the change in velocity in the y direction
-# f                - acceleration provided by getForce function
-# p1x, p1y, p1z    - x, y, and z coordinates of particle 1
-# p1vx, p1vy, p1vz - x, y, and z component velocities of particle 1
-# p2x, p2y, p2z    - x, y, and z coordinates of particle 2
-# p1m, p2m         - masses of particles 1 and 2
-# p1q, p2q         - charges of particles 1 and 2
-def ycompNV(f, p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q):
-    dx = p1x-p2x # distances between particles in each direction
-    dy = p1y-p2y
-    dz = p1z-p2z
-    r = math.sqrt( dx**2 + dy**2 + dz**2 ) # distance formula
-    alpha = (np.where(dx < 0, -math.asin(dy/r), math.asin(dy/r)))*1.0 # see https://bit.ly/3Hq4s7v - the angle is negative if the x value moves in the negative direction
-    return np.where(f==0, 0, f*math.sin(alpha))*1.0                   # see https://bit.ly/3Hq4s7v - if force is zero, no change in y
+    # calculate component vectors of forces - see https://bit.ly/3Hq4s7v
+    xforce = np.where(f==0, 0, f*math.cos(alpha)*math.sin(beta))*1.0
+    yforce = np.where(f==0, 0, f*math.sin(alpha))*1.0
+    zforce = np.where(f==0, 0, f*math.cos(alpha)*math.cos(beta))*1.0
+    return (xforce, yforce, zforce)
 
-# function to calculate the change in velocity in the z direction
-# f                - acceleration provided by getForce function
-# p1x, p1y, p1z    - x, y, and z coordinates of particle 1
-# p1vx, p1vy, p1vz - x, y, and z component velocities of particle 1
-# p2x, p2y, p2z    - x, y, and z coordinates of particle 2
-# p1m, p2m         - masses of particles 1 and 2
-# p1q, p2q         - charges of particles 1 and 2
-def zcompNV(f, p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q):
-    dx = p1x-p2x # distances between particles in each direction
-    dy = p1y-p2y
-    dz = p1z-p2z
-    r = math.sqrt( dx**2 + dy**2 + dz**2 ) # distance formula
-    alpha = (np.where(dx < 0, -math.asin(dy/r), math.asin(dy/r)))*1.0 # see https://bit.ly/3Hq4s7v - the angle is negative if the x value moves in the negative direction
-    beta = (np.where(dz == 0, math.pi, math.atan(dx/dz)))*1.0         # see https://bit.ly/3Hq4s7v - the angle is pi if there is no change in z
-    return np.where(f==0, 0, f*math.cos(alpha)*math.cos(beta))*1.0    # see https://bit.ly/3Hq4s7v - if force is zero, no change in z
-
-# vectorize functions
-getForce = np.vectorize(getForceNV)
-xcomp    = np.vectorize(xcompNV)
-ycomp    = np.vectorize(ycompNV)
-zcomp    = np.vectorize(zcompNV)
+# vectorize getForce function
+getForce = np.frompyfunc(getForceNV, 13, 3)
 
 # main program function
 def main():
@@ -145,10 +101,7 @@ def main():
             end_process.append([n, px.tolist(), py.tolist(), pz.tolist()])
         
         for cp in range(p): # calculate forces on each particle
-            forces = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # get acceleration
-            chg_vx = xcomp(forces, px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # change in x velocity
-            chg_vy = ycomp(forces, px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # change in y velocity
-            chg_vz = zcomp(forces, px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # change in z velocity
+            chg_vx, chg_vy, chg_vz = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # get acceleration
 
             # update variables
             pvx[cp] = np.sum(chg_vx)+pvx[cp]
