@@ -74,6 +74,38 @@ end_process = []          # list to store data which will be processed at the en
 # p2x, p2y, p2z    - x, y, and z coordinates of particle 2
 # p1m, p2m         - masses of particles 1 and 2
 # p1q, p2q         - charges of particles 1 and 2
+CUDA_KERNEL = r'''
+extern "C" __global__
+void get_force(float* p1x, float* p1y, float* p1z, float* p1vx, float* p1vy, float* p1vz, float* p1m, float* p1q, float* p2x, float* p2y, float* p2z, float* p2m, float* p2q){
+    int j = threadIdx.x;
+    int i = blockIdx.x;
+    int k = blockDim.x;
+    int tid = k*i+j;
+
+    float G = 1;
+    float k = 1;
+
+    float dx = *p1x - *p2x[tid];
+    float dy = *p1y - *p2y[tid];
+    float dz = *p1z - *p2z[tid];
+
+    float r = sqrt( dx*dx + dy*dy + dz*dz );
+    if(r==0){ return; }
+    
+    float f = ( G * *p1m * *p2m[tid] - k * *p1q * *p2q[tid] ) / (r*r);
+    
+    float alpha = arcsin(dy/r);
+    float beta = arctan(dx/dz);
+    if(dx < 0){ alpha = -alpha; }
+
+    *p1vx = *p1vx + f*cos(alpha)*sin(beta);
+    *p1vy = *p1vy + f*sin(alpha);
+    *p1vz = *p1vz + f*cos(alpha)*cos(beta);
+}
+'''
+
+getForce = np.RawKernel(CUDA_KERNEL, 'get_force')
+
 def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q):
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
@@ -101,7 +133,7 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     return (xforce, yforce, zforce)
 
 # vectorize getForce function
-getForce = np.vectorize(getForceNV) #np.frompyfunc(getForceNV, 13, 3)
+# getForce = np.vectorize(getForceNV) #np.frompyfunc(getForceNV, 13, 3)
 
 # main program function
 def main():
