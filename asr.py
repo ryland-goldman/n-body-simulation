@@ -31,12 +31,19 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.                                       
 
-import numpy as np
+CUPY_OR_NUMPY = "CuPy"
 import matplotlib as mp
 import matplotlib.pyplot as plt
 import os
 import math
 import time
+
+if CUPY_OR_NUMPY == "NumPy":
+    import numpy as np
+elif CUPY_OR_NUMPY == "CuPy":
+    import cupy as np
+else:
+    raise Exception("Please set a library to use")
 
 # constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
 G = 1      # gravitational constant
@@ -46,7 +53,7 @@ t = 1e-7   # time constant
 p = 10     # particles
  
 # initial conditions
-iterations = int(1e4) # iterations of simulation
+iterations = int(1e3) # iterations of simulation
 frequency  = int(5e2)  # frequency of recording frames
 
 # data storage, numpy arrays for each of the eight data points
@@ -71,7 +78,10 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
     dz = p1z-p2z
-    r = math.sqrt( dx**2 + dy**2 + dz**2 ) + E # distance formula
+
+    # distance formula
+    r = dx**2 + dy**2 + dz**2
+    r = np.sqrt( r ) + E 
 
     # calculate force
     f = t*(( # multiply by time constant
@@ -81,17 +91,17 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
         )*1.0)/p1m # divide by mass because of newton's 2nd law, so technically it's returning acceleration, not mass
 
     # calculate angles - see https://bit.ly/3Hq4s7v
-    alpha = (np.where(dx < 0, -math.asin(dy/r), math.asin(dy/r)))*1.0 # the angle is negative if the x value moves in the negative direction
-    beta = (np.where(dz == 0, math.pi, math.atan(dx/(dz+E))))*1.0     # the angle is pi if there is no change in z
+    alpha = np.where(dx < 0, -np.arcsin(dy/r), np.arcsin(dy/r)) # the angle is negative if the x value moves in the negative direction
+    beta = np.arctan(dx/(dz+E))
 
     # calculate component vectors of forces - see https://bit.ly/3Hq4s7v
-    xforce = np.where(f==0, 0, f*math.cos(alpha)*math.sin(beta))*1.0
-    yforce = np.where(f==0, 0, f*math.sin(alpha))*1.0
-    zforce = np.where(f==0, 0, f*math.cos(alpha)*math.cos(beta))*1.0
+    xforce = np.where(f==0, 0, f*np.cos(alpha)*np.sin(beta))
+    yforce = np.where(f==0, 0, f*np.sin(alpha))
+    zforce = np.where(f==0, 0, f*np.cos(alpha)*np.cos(beta))
     return (xforce, yforce, zforce)
 
 # vectorize getForce function
-getForce = np.frompyfunc(getForceNV, 13, 3)
+getForce = np.vectorize(getForceNV) #np.frompyfunc(getForceNV, 13, 3)
 
 # main program function
 def main():
