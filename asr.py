@@ -29,34 +29,38 @@
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.                                       
+# SOFTWARE.           
 
-CUPY_OR_NUMPY = "CuPy"
-import matplotlib as mp
-import matplotlib.pyplot as plt
+FRAMEWORK = "CuPy" # set to `CuPy`, `NumPy`, or `PyOpenCL`
+
+######## LIBRARIES ########
 import os
+import sys
 import math
 import time
-
-if CUPY_OR_NUMPY == "NumPy":
-    import numpy as np
-elif CUPY_OR_NUMPY == "CuPy":
-    import cupy as np
+if FRAMEWORK == "CuPy":
+    import cupy as np     # import CuPy library
+elif FRAMEWORK == "NumPy":
+    import numpy as np    # import NumPy library
+    import numba
+elif FRAMEWORK == "PyOpenCL":
+    raise NotImplementedError("PyOpenCL has not yet been implemented")
+    import pyopencl as cl # import PyOpenCL library
+elif FRAMEWORK == "None":
+    raise NotImplementedError("A framework is currently required.")
 else:
-    raise Exception("Please set a library to use")
+    raise RuntimeError("Please specify a valid framework.")
 
-# constants, 1 now because units don't exist when there's nothing to compare them to (time/distance/speed/direction/etc. are relative)
-G = 1      # gravitational constant
-k = 1      # coulomb constant
-E = 1e-100 # softening constant
-t = 1e-7   # time constant
-p = 10     # particles
- 
-# initial conditions
-iterations = int(1e3) # iterations of simulation
-frequency  = int(5e2)  # frequency of recording frames
+######## CONSTANTS ########
+G = 1.0                   # gravitational constant
+k = 1.0                   # coloumb's constant
+E = sys.float_info.min    # softening constant
+t = 1e-3                  # time constant
+p = int(1e2)              # particles
 
-# data storage, numpy arrays for each of the eight data points
+######## DATA STORAGE ########
+iterations = int(1e2)     # iterations of simulation
+frequency  = int(1)      # frequency of recording frames
 px = np.random.rand(p)    # x, y, z coordinates
 py = np.random.rand(p)    # x, y, z coordinates
 pz = np.random.rand(p)    # x, y, z coordinates
@@ -67,6 +71,47 @@ pq = np.random.rand(p)    # charge
 pm = np.random.rand(p)    # mass
 end_process = []          # list to store data which will be processed at the end
 
+######## CUDA SETUP ########
+if FRAMEWORK == "CuPy":
+    num_blocks = 10
+    num_threads = 10
+
+    force_kernel = np.RawKernel(
+        r'''
+        extern "C" __global__
+        void force_kernel(
+            const double p1x, const double p1y, const double p1z, const double p1m, const double p1q, const double* p2x, const double* p2y, const double* p2z, const double* p2m, const double* p2q, double* p1vx, double* p1vy, double* p1vz
+        ) {
+            int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+            double G = '''+f'{G:.20f}'+''';
+            double k = '''+f'{k:.20f}'+''';
+            double E = '''+f'{E:.400f}'+''';
+            double t = '''+f'{t:.200f}'+''';
+
+            double dx = p1x-p2x[tid];
+            double dy = p1y-p2y[tid];
+            double dz = p1z-p2z[tid];
+            
+            float r = sqrt( dx*dx + dy*dy + dz*dz );
+            if( r != 0.0 ){
+                double f = t*(G*p1m*p2m[tid] - k*p1q*p2q[tid])/(r*r+E);
+                double alpha = asin(dy/(r+E));
+                double beta = atan(dx/(dz+E));
+
+                if(dx<0){ alpha = -alpha; }
+
+                p1vx[tid] = f * cos(alpha) * sin(beta);
+                p1vy[tid] = f * sin(alpha);
+                p1vz[tid] = f * cos(alpha) * cos(beta);
+            } else {
+                p1vx[tid] = 0.0;
+                p1vy[tid] = 0.0;
+                p1vz[tid] = 0.0;
+            }
+        }''', 'force_kernel')
+
+######## NUMPY SETUP ########
 # function to calculate the acceleration of one particle on another given the distance, mass, and charge
 # returns a tuple of the component forces, in the format of (x,y,z)
 # p1x, p1y, p1z    - x, y, and z coordinates of particle 1
@@ -74,6 +119,7 @@ end_process = []          # list to store data which will be processed at the en
 # p2x, p2y, p2z    - x, y, and z coordinates of particle 2
 # p1m, p2m         - masses of particles 1 and 2
 # p1q, p2q         - charges of particles 1 and 2
+# @numba.njit(parallel=True)
 def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q):
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
@@ -99,11 +145,11 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     yforce = np.where(f==0, 0, f*np.sin(alpha))
     zforce = np.where(f==0, 0, f*np.cos(alpha)*np.cos(beta))
     return (xforce, yforce, zforce)
+if FRAMEWORK == "NumPy":
+    getForce = np.vectorize(getForceNV) # vectorize the function
 
-# vectorize getForce function
-getForce = np.vectorize(getForceNV) #np.frompyfunc(getForceNV, 13, 3)
 
-# main program function
+######## MAIN PROGRAM FUNCTION ########
 def main():
     global px, py, pz, pvx, pvy, pvz, pq, pm # global variables
     for n in range(iterations):
@@ -111,22 +157,39 @@ def main():
             end_process.append([n, px.tolist(), py.tolist(), pz.tolist()])
         
         for cp in range(p): # calculate forces on each particle
-            chg_vx, chg_vy, chg_vz = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # get acceleration
 
-            # update variables
-            pvx[cp] = np.sum(chg_vx)+pvx[cp]
-            pvy[cp] = np.sum(chg_vy)+pvy[cp]
-            pvz[cp] = np.sum(chg_vz)+pvz[cp]
+            if FRAMEWORK == "NumPy":
+                chg_vx, chg_vy, chg_vz = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # get acceleration
+
+                # update variables
+                pvx[cp] = np.sum(chg_vx)+pvx[cp]
+                pvy[cp] = np.sum(chg_vy)+pvy[cp]
+                pvz[cp] = np.sum(chg_vz)+pvz[cp]
+
+            if FRAMEWORK == "CuPy":
+                chg_vx = np.zeros((p))
+                chg_vy = np.zeros((p))
+                chg_vz = np.zeros((p))
+                force_kernel((num_blocks,),(num_threads,),(px[cp], py[cp], pz[cp], pm[cp], pq[cp], px, py, pz, pm, pq, chg_vx, chg_vy, chg_vz)) # get acceleration
+
+                # update variables
+                pvx[cp] = np.sum(chg_vx)+pvx[cp]
+                pvy[cp] = np.sum(chg_vy)+pvy[cp]
+                pvz[cp] = np.sum(chg_vz)+pvz[cp]
 
         # push particles with new velocities
         px += pvx
         py += pvy
         pz += pvz
 
+
+######## VIDEO PROCESSING ########
 # function to convert a 2D array into a video animation
 # frames - 2D array, with the first dimension representing individual frames, and the second dimension containing a counter and lists of x, y, and z coordinates
 def create_video(frames):
-    mp.use("TkAgg") # set backend of matplotlib to Tkinter
+    import matplotlib as mp
+    mp.use("agg") # alternatively, set backend of matplotlib to Tkinter ("TkAgg")
+    import matplotlib.pyplot as plt
     counter = 0     # create a counter
     for frame in frames:   # loop through each frame in list
         fig = plt.figure() # create a new plot
@@ -159,7 +222,9 @@ midpoint_time = time.time() # runtime of program, exluding animation
 create_video(end_process)   # create animation
 end_time = time.time()      # runtime of program, including animation
 
-print("Program has completed running.")
+print("Program has completed running using",FRAMEWORK)
+if FRAMEWORK == "CuPy":
+    print(p," particles at ",num_blocks,"x",num_threads)
 print("Time to run N-body simulation: ",math.floor((midpoint_time-start_time)*100)/100," seconds")
 print("Time to create animation:      ",math.floor((end_time-midpoint_time)*100)/100," seconds")
 print("Total time:                    ",math.floor((end_time-start_time)*100)/100," seconds")
