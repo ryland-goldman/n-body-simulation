@@ -34,8 +34,6 @@
 FRAMEWORK = "CuPy" # set to `CuPy`, `NumPy`, or `PyOpenCL`
 
 ######## LIBRARIES ########
-import matplotlib as mp
-import matplotlib.pyplot as plt
 import os
 import sys
 import math
@@ -44,9 +42,12 @@ if FRAMEWORK == "CuPy":
     import cupy as np     # import CuPy library
 elif FRAMEWORK == "NumPy":
     import numpy as np    # import NumPy library
+    import numba
 elif FRAMEWORK == "PyOpenCL":
-    import pyopencl as cl # import PyOpenCL library
     raise NotImplementedError("PyOpenCL has not yet been implemented")
+    import pyopencl as cl # import PyOpenCL library
+elif FRAMEWORK == "None":
+    raise NotImplementedError("A framework is currently required.")
 else:
     raise RuntimeError("Please specify a valid framework.")
 
@@ -55,11 +56,11 @@ G = 1.0                   # gravitational constant
 k = 1.0                   # coloumb's constant
 E = sys.float_info.min    # softening constant
 t = 1e-3                  # time constant
-p = 1e4                   # particles
+p = int(1e2)              # particles
 
 ######## DATA STORAGE ########
-iterations = int(1e3)     # iterations of simulation
-frequency  = int(5e2)     # frequency of recording frames
+iterations = int(1e2)     # iterations of simulation
+frequency  = int(1)      # frequency of recording frames
 px = np.random.rand(p)    # x, y, z coordinates
 py = np.random.rand(p)    # x, y, z coordinates
 pz = np.random.rand(p)    # x, y, z coordinates
@@ -72,18 +73,10 @@ end_process = []          # list to store data which will be processed at the en
 
 ######## CUDA SETUP ########
 if FRAMEWORK == "CuPy":
-    device = np.cuda.Device(0)
-    max_threads_per_block = device.attributes["MaxThreadsPerBlock"]
-    num_threads = p
-    num_blocks = (num_threads + max_threads_per_block - 1) // max_threads_per_block
-    max_active_blocks_per_multiprocessor = device.attributes["MaxBlocksPerMultiprocessor"]
-    block_size = max_threads_per_block
-    while block_size > 1:
-        if num_blocks % max_active_blocks_per_multiprocessor == 0:
-            break
-        block_size //= 2
-    
-    force_kernel = cupy.RawKernel(
+    num_blocks = 10
+    num_threads = 10
+
+    force_kernel = np.RawKernel(
         r'''
         extern "C" __global__
         void force_kernel(
@@ -126,6 +119,7 @@ if FRAMEWORK == "CuPy":
 # p2x, p2y, p2z    - x, y, and z coordinates of particle 2
 # p1m, p2m         - masses of particles 1 and 2
 # p1q, p2q         - charges of particles 1 and 2
+# @numba.njit(parallel=True)
 def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q):
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
@@ -150,6 +144,7 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     xforce = np.where(f==0, 0, f*np.cos(alpha)*np.sin(beta))
     yforce = np.where(f==0, 0, f*np.sin(alpha))
     zforce = np.where(f==0, 0, f*np.cos(alpha)*np.cos(beta))
+    return (xforce, yforce, zforce)
 if FRAMEWORK == "NumPy":
     getForce = np.vectorize(getForceNV) # vectorize the function
 
@@ -172,10 +167,10 @@ def main():
                 pvz[cp] = np.sum(chg_vz)+pvz[cp]
 
             if FRAMEWORK == "CuPy":
-                chg_vx = np.zeros((particles))
-                chg_vy = np.zeros((particles))
-                chg_vz = np.zeros((particles))
-                force_kernel((num_blocks,),(block_size,),(px[cp], py[cp], pz[cp], pm[cp], pq[cp], px, py, pz, pm, pq, chg_vx, chg_vy, chg_vz)) # get acceleration
+                chg_vx = np.zeros((p))
+                chg_vy = np.zeros((p))
+                chg_vz = np.zeros((p))
+                force_kernel((num_blocks,),(num_threads,),(px[cp], py[cp], pz[cp], pm[cp], pq[cp], px, py, pz, pm, pq, chg_vx, chg_vy, chg_vz)) # get acceleration
 
                 # update variables
                 pvx[cp] = np.sum(chg_vx)+pvx[cp]
@@ -192,7 +187,9 @@ def main():
 # function to convert a 2D array into a video animation
 # frames - 2D array, with the first dimension representing individual frames, and the second dimension containing a counter and lists of x, y, and z coordinates
 def create_video(frames):
-    mp.use("TkAgg") # set backend of matplotlib to Tkinter
+    import matplotlib as mp
+    mp.use("agg") # alternatively, set backend of matplotlib to Tkinter ("TkAgg")
+    import matplotlib.pyplot as plt
     counter = 0     # create a counter
     for frame in frames:   # loop through each frame in list
         fig = plt.figure() # create a new plot
@@ -225,7 +222,9 @@ midpoint_time = time.time() # runtime of program, exluding animation
 create_video(end_process)   # create animation
 end_time = time.time()      # runtime of program, including animation
 
-print("Program has completed running using ",FRAMEWORK)
+print("Program has completed running using",FRAMEWORK)
+if FRAMEWORK == "CuPy":
+    print(p," particles at ",num_blocks,"x",num_threads)
 print("Time to run N-body simulation: ",math.floor((midpoint_time-start_time)*100)/100," seconds")
 print("Time to create animation:      ",math.floor((end_time-midpoint_time)*100)/100," seconds")
 print("Total time:                    ",math.floor((end_time-start_time)*100)/100," seconds")
