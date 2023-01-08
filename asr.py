@@ -31,18 +31,18 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.           
 
-FRAMEWORK = "CuPy" # set to `CuPy`, `NumPy`, or `PyOpenCL`
+FRAMEWORK = "NumPy-M"
 
 ######## LIBRARIES ########
 import os
 import sys
 import math
 import time
+import numba
 if FRAMEWORK == "CuPy":
     import cupy as np     # import CuPy library
-elif FRAMEWORK == "NumPy":
+elif FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
     import numpy as np    # import NumPy library
-    import numba
 elif FRAMEWORK == "PyOpenCL":
     raise NotImplementedError("PyOpenCL has not yet been implemented")
     import pyopencl as cl # import PyOpenCL library
@@ -52,50 +52,54 @@ else:
     raise RuntimeError("Please specify a valid framework.")
 
 ######## CONSTANTS ########
-G = 1.0                   # gravitational constant
-k = 1.0                   # coloumb's constant
-E = sys.float_info.min    # softening constant
-t = 1e-3                  # time constant
-p = int(1e2)              # particles
+G = 100.0                  # gravitational constant
+k = 0.0                    # coloumb's constant
+E = sys.float_info.min     # softening constant
+t = 1e-5                   # time constant
+p = int(50)                # particles
+s = 0.05                   # particle size
 
 ######## DATA STORAGE ########
-iterations = int(1e2)     # iterations of simulation
-frequency  = int(1)      # frequency of recording frames
-px = np.random.rand(p)    # x, y, z coordinates
-py = np.random.rand(p)    # x, y, z coordinates
-pz = np.random.rand(p)    # x, y, z coordinates
-pvx = np.random.rand(p)*t # component velocities: x, y, z
-pvy = np.random.rand(p)*t # component velocities: x, y, z
-pvz = np.random.rand(p)*t # component velocities: x, y, z
-pq = np.random.rand(p)    # charge
-pm = np.random.rand(p)    # mass
-end_process = []          # list to store data which will be processed at the end
+iterations = int(1e4)      # iterations of simulation
+frequency  = int(100)      # frequency of recording frames
+px = np.random.rand(p)     # x, y, z coordinates
+py = np.random.rand(p)     # x, y, z coordinates
+pz = np.random.rand(p)     # x, y, z coordinates
+pvx = np.zeros(p)*t        # component velocities: x, y, z
+pvy = np.zeros(p)*t        # component velocities: x, y, z
+pvz = np.zeros(p)*t        # component velocities: x, y, z
+pq = np.random.rand(p)     # charge
+pm = np.random.rand(p)     # mass
+end_process = []           # list to store data which will be processed at the end
 
 ######## CUDA SETUP ########
 if FRAMEWORK == "CuPy":
-    num_blocks = 10
-    num_threads = 10
+    num_blocks = 1
+    num_threads = 50
+
+    if p > (num_blocks * num_threads):
+        raise RuntimeError("Invalid number of blocks and threads.")
 
     force_kernel = np.RawKernel(
-        r'''
+        r'''#include <cuda_runtime.h>
         extern "C" __global__
         void force_kernel(
-            const double p1x, const double p1y, const double p1z, const double p1m, const double p1q, const double* p2x, const double* p2y, const double* p2z, const double* p2m, const double* p2q, double* p1vx, double* p1vy, double* p1vz
+            double p1x, double p1y, double p1z, double p1m, double p1q, double* p2x, double* p2y, double* p2z, double* p2m, double* p2q, double* p1vx, double* p1vy, double* p1vz
         ) {
             int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
+            
             double G = '''+f'{G:.20f}'+''';
             double k = '''+f'{k:.20f}'+''';
             double E = '''+f'{E:.400f}'+''';
             double t = '''+f'{t:.200f}'+''';
 
-            double dx = p1x-p2x[tid];
-            double dy = p1y-p2y[tid];
-            double dz = p1z-p2z[tid];
+            double dx = p1x - p2x[tid];
+            double dy = p1y - p2y[tid];
+            double dz = p1z - p2z[tid];
             
-            float r = sqrt( dx*dx + dy*dy + dz*dz );
+            double r = sqrt( dx*dx + dy*dy + dz*dz );
             if( r != 0.0 ){
-                double f = t*(G*p1m*p2m[tid] - k*p1q*p2q[tid])/(r*r+E);
+                double f = t * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/((r * r+E)*p1m);
                 double alpha = asin(dy/(r+E));
                 double beta = atan(dx/(dz+E));
 
@@ -119,7 +123,7 @@ if FRAMEWORK == "CuPy":
 # p2x, p2y, p2z    - x, y, and z coordinates of particle 2
 # p1m, p2m         - masses of particles 1 and 2
 # p1q, p2q         - charges of particles 1 and 2
-# @numba.njit(parallel=True)
+@numba.njit(error_model="numpy", parallel=(FRAMEWORK=="NumPy-M"), fastmath=True)
 def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q):
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
@@ -127,56 +131,62 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
 
     # distance formula
     r = dx**2 + dy**2 + dz**2
-    r = np.sqrt( r ) + E 
+    r = np.sqrt( r )
 
     # calculate force
-    f = t*(( # multiply by time constant
-        np.where(
-            (p1x == p2x) & (p1y == p2y) & (p1z == p2z), 0.0, # if the particles are the same, then there is no force between them to be calculated
-            (G*p1m*p2m)/((r)**2) - (k*p1q*p2q)/((r)**2))     # otherwise, use newton's law of universal gravitation, and coulomb's law (subtraction because opposites attract, like charges repel)
-        )*1.0)/p1m # divide by mass because of newton's 2nd law, so technically it's returning acceleration, not mass
+    f = t * (G*p1m*p2m - k*p1q*p2q)/( (E + r**2 ) * p1m) # use newton's law of universal gravitation, and coulomb's law (subtraction because opposites attract, like charges repel), divide by mass because of newton's 2nd law
 
     # calculate angles - see https://bit.ly/3Hq4s7v
-    alpha = np.where(dx < 0, -np.arcsin(dy/r), np.arcsin(dy/r)) # the angle is negative if the x value moves in the negative direction
+    alpha = np.where(dx < 0, -np.arcsin(dy/(r+E)), np.arcsin(dy/(r+E))) # the angle is negative if the x value moves in the negative direction
     beta = np.arctan(dx/(dz+E))
 
     # calculate component vectors of forces - see https://bit.ly/3Hq4s7v
-    xforce = np.where(f==0, 0, f*np.cos(alpha)*np.sin(beta))
-    yforce = np.where(f==0, 0, f*np.sin(alpha))
-    zforce = np.where(f==0, 0, f*np.cos(alpha)*np.cos(beta))
+    xforce = np.where(r==0, 0, f*np.cos(alpha)*np.sin(beta))
+    yforce = np.where(r==0, 0, f*np.sin(alpha))
+    zforce = np.where(r==0, 0, f*np.cos(alpha)*np.cos(beta))
     return (xforce, yforce, zforce)
-if FRAMEWORK == "NumPy":
-    getForce = np.vectorize(getForceNV) # vectorize the function
 
+if FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
+    getForce = np.vectorize(getForceNV) # vectorize the function
 
 ######## MAIN PROGRAM FUNCTION ########
 def main():
     global px, py, pz, pvx, pvy, pvz, pq, pm # global variables
     for n in range(iterations):
+        if (n/iterations)*100 % 1 == 0:
+            print((n/iterations)*100)
+        
         if n % frequency == 0:
             end_process.append([n, px.tolist(), py.tolist(), pz.tolist()])
-        
-        for cp in range(p): # calculate forces on each particle
 
-            if FRAMEWORK == "NumPy":
-                chg_vx, chg_vy, chg_vz = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # get acceleration
-
-                # update variables
+        if FRAMEWORK == "NumPy-M":
+            for cp in numba.prange(p):
+                chg_vx, chg_vy, chg_vz = getForceNV( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq )
                 pvx[cp] = np.sum(chg_vx)+pvx[cp]
                 pvy[cp] = np.sum(chg_vy)+pvy[cp]
                 pvz[cp] = np.sum(chg_vz)+pvz[cp]
+        else:
+            for cp in range(p): # calculate forces on each particle
 
-            if FRAMEWORK == "CuPy":
-                chg_vx = np.zeros((p))
-                chg_vy = np.zeros((p))
-                chg_vz = np.zeros((p))
-                force_kernel((num_blocks,),(num_threads,),(px[cp], py[cp], pz[cp], pm[cp], pq[cp], px, py, pz, pm, pq, chg_vx, chg_vy, chg_vz)) # get acceleration
+                if FRAMEWORK == "NumPy":
+                    chg_vx, chg_vy, chg_vz = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # get acceleration
 
-                # update variables
-                pvx[cp] = np.sum(chg_vx)+pvx[cp]
-                pvy[cp] = np.sum(chg_vy)+pvy[cp]
-                pvz[cp] = np.sum(chg_vz)+pvz[cp]
+                    # update variables
+                    pvx[cp] = np.sum(chg_vx)+pvx[cp]
+                    pvy[cp] = np.sum(chg_vy)+pvy[cp]
+                    pvz[cp] = np.sum(chg_vz)+pvz[cp]
+                if FRAMEWORK == "CuPy":
+                    chg_vx = np.zeros((p))
+                    chg_vy = np.zeros((p))
+                    chg_vz = np.zeros((p))
+                    
+                    force_kernel((num_blocks,),(num_threads,),(float(px[cp]), float(py[cp]), float(pz[cp]), float(pm[cp]), float(pq[cp]), px, py, pz, pm, pq, chg_vx, chg_vy, chg_vz)) # get acceleration
 
+                    # update variables
+                    pvx[cp] = np.sum(chg_vx)+pvx[cp]
+                    pvy[cp] = np.sum(chg_vy)+pvy[cp]
+                    pvz[cp] = np.sum(chg_vz)+pvz[cp]
+    
         # push particles with new velocities
         px += pvx
         py += pvy
@@ -223,8 +233,8 @@ create_video(end_process)   # create animation
 end_time = time.time()      # runtime of program, including animation
 
 print("Program has completed running using",FRAMEWORK)
-if FRAMEWORK == "CuPy":
-    print(p," particles at ",num_blocks,"x",num_threads)
+if FRAMEWORK == "CuPy": print("Blocks/Threads:",num_blocks,"x",num_threads)
+print(p,"particles for",iterations,"frames, recording every",frequency,"frames")
 print("Time to run N-body simulation: ",math.floor((midpoint_time-start_time)*100)/100," seconds")
 print("Time to create animation:      ",math.floor((end_time-midpoint_time)*100)/100," seconds")
 print("Total time:                    ",math.floor((end_time-start_time)*100)/100," seconds")
