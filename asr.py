@@ -32,6 +32,7 @@
 # SOFTWARE.           
 
 FRAMEWORK = "NumPy-M"
+DISPLAY = "Plot"
 
 ######## LIBRARIES ########
 import os
@@ -39,6 +40,8 @@ import sys
 import math
 import time
 import numba
+import pandas
+import plotly.express as plotlyx
 if FRAMEWORK == "CuPy":
     import cupy as np     # import CuPy library
 elif FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
@@ -55,13 +58,13 @@ else:
 G = 1000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
 E = sys.float_info.min     # softening constant
-t = 1e-10                  # time constant
-p = int(500)               # particles
+t = 1e-3                  # time constant
+p = int(1e2)               # particles
 s = 0.05                   # particle size
 
 ######## DATA STORAGE ########
-iterations = int(1e5)      # iterations of simulation
-frequency  = int(1e2)        # frequency of recording frames
+iterations = int(50)      # iterations of simulation
+frequency  = int(1e0)        # frequency of recording frames
 px = np.random.rand(p)*10  # x, y, z coordinates
 py = np.random.rand(p)*10  # x, y, z coordinates
 pz = np.random.rand(p)*10  # x, y, z coordinates
@@ -74,8 +77,8 @@ end_process = []           # list to store data which will be processed at the e
 
 ######## CUDA SETUP ########
 if FRAMEWORK == "CuPy":
-    num_blocks = 1
-    num_threads = 500
+    num_blocks = 10
+    num_threads = 1000
 
     if p > (num_blocks * num_threads):
         raise RuntimeError("Invalid number of blocks and threads.")
@@ -243,34 +246,52 @@ def main():
 # frames - 2D array, with the first dimension representing individual frames, and the second dimension containing a counter and lists of x, y, and z coordinates
 def create_video(frames):
     print("100.0% complete  \tProcessing...")
-    import matplotlib as mp
-    mp.use("agg") # alternatively, set backend of matplotlib to Tkinter ("TkAgg")
-    import matplotlib.pyplot as plt
-    counter = 0     # create a counter
-    for frame in frames:   # loop through each frame in list
-        fig = plt.figure() # create a new plot
-        ax = fig.add_subplot(projection='3d')    # new 3D plot
-        ax.clear()         # clear plot
-        ax.scatter3D(frame[1],frame[2],frame[3]) # add x, y, and z axes
-        plt.savefig('C:\\Nbody\\files\\frame-'+str(counter)+'.png') # save image in C:\Nbody
-        ax.clear()         # clear plot
-        plt.close(fig)     # close plot
-        counter = counter + 1 # increment counter
+    if DISPLAY == 'Video' or DISPLAY == 'Both':
+        import matplotlib as mp
+        mp.use("agg") # alternatively, set backend of matplotlib to Tkinter ("TkAgg")
+        import matplotlib.pyplot as plt
+        counter = 0     # create a counter
+        for frame in frames:   # loop through each frame in list
+            fig = plt.figure() # create a new plot
+            ax = fig.add_subplot(projection='3d')    # new 3D plot
+            ax.clear()         # clear plot
+            ax.scatter3D(frame[1],frame[2],frame[3]) # add x, y, and z axes
+            plt.savefig('C:\\Nbody\\files\\frame-'+str(counter)+'.png') # save image in C:\Nbody
+            ax.clear()         # clear plot
+            plt.close(fig)     # close plot
+            counter = counter + 1 # increment counter
 
-    # use FFmpeg to generate a video, switching the frame rate based on the number of frames
-    if iterations/frequency > 2500:
-        os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 60 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
-    if iterations/frequency > 500:
-        os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 30 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
-    if iterations/frequency > 100:
-        os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 20 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
-    else:
-        os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 10 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+        # use FFmpeg to generate a video, switching the frame rate based on the number of frames
+        if iterations/frequency > 2500:
+            os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 60 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+        if iterations/frequency > 500:
+            os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 30 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+        if iterations/frequency > 100:
+            os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 20 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+        else:
+            os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 10 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
 
-    # remove all files in directory
-    filelist = [ f for f in os.listdir("C:\\Nbody\\files\\") if f.endswith(".png") ]
-    for f in filelist:
-        os.remove(os.path.join("C:\\Nbody\\files\\", f))
+        # remove all files in directory
+        filelist = [ f for f in os.listdir("C:\\Nbody\\files\\") if f.endswith(".png") ]
+        for f in filelist:
+            os.remove(os.path.join("C:\\Nbody\\files\\", f))
+    if DISPLAY == 'Plot' or DISPLAY == 'Both':
+        data_x = []
+        data_y = []
+        data_z = []
+        data_p = []
+        data_f = []
+        for frame in frames:
+            for p in range(len(frame[1])):
+                data_x.append(frame[1][p])
+                data_y.append(frame[2][p])
+                data_z.append(frame[3][p])
+                data_p.append(p)
+                data_f.append(frame[0])
+        data = pandas.DataFrame(data={'x':data_x,'y':data_y,'z':data_z,'f':data_f,'p':data_p})
+        fig = plotlyx.scatter_3d(data, x='x', y='y', z='z', animation_frame='f', animation_group='p')
+        fig.update_layout(scene=dict(xaxis=dict(range=[min(data_x), max(data_x)],autorange=False),yaxis=dict(range=[min(data_y), max(data_y)],autorange=False),zaxis=dict(range=[min(data_z), max(data_z)],autorange=False)))
+        fig.show()
 
 start_time = time.time()    # start of program
 main()                      # run program
