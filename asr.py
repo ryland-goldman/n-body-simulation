@@ -52,30 +52,30 @@ else:
     raise RuntimeError("Please specify a valid framework.")
 
 ######## CONSTANTS ########
-G = 100.0                  # gravitational constant
+G = 1000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
 E = sys.float_info.min     # softening constant
-t = 1e-5                   # time constant
-p = int(50)                # particles
+t = 1e-10                  # time constant
+p = int(500)               # particles
 s = 0.05                   # particle size
 
 ######## DATA STORAGE ########
-iterations = int(1e4)      # iterations of simulation
-frequency  = int(100)      # frequency of recording frames
-px = np.random.rand(p)     # x, y, z coordinates
-py = np.random.rand(p)     # x, y, z coordinates
-pz = np.random.rand(p)     # x, y, z coordinates
+iterations = int(1e5)      # iterations of simulation
+frequency  = int(1e2)        # frequency of recording frames
+px = np.random.rand(p)*10  # x, y, z coordinates
+py = np.random.rand(p)*10  # x, y, z coordinates
+pz = np.random.rand(p)*10  # x, y, z coordinates
 pvx = np.zeros(p)*t        # component velocities: x, y, z
 pvy = np.zeros(p)*t        # component velocities: x, y, z
 pvz = np.zeros(p)*t        # component velocities: x, y, z
-pq = np.random.rand(p)     # charge
-pm = np.random.rand(p)     # mass
+pq = np.ones(p)            # charge
+pm = np.ones(p)            # mass
 end_process = []           # list to store data which will be processed at the end
 
 ######## CUDA SETUP ########
 if FRAMEWORK == "CuPy":
     num_blocks = 1
-    num_threads = 50
+    num_threads = 500
 
     if p > (num_blocks * num_threads):
         raise RuntimeError("Invalid number of blocks and threads.")
@@ -84,7 +84,7 @@ if FRAMEWORK == "CuPy":
         r'''#include <cuda_runtime.h>
         extern "C" __global__
         void force_kernel(
-            double p1x, double p1y, double p1z, double p1m, double p1q, double* p2x, double* p2y, double* p2z, double* p2m, double* p2q, double* p1vx, double* p1vy, double* p1vz
+            double p1x, double p1y, double p1z, double p1vxi, double p1vyi, double p1vzi, double p1m, double p1q, double* p2x, double* p2y, double* p2z, double* p2m, double* p2q, double* p1vx, double* p1vy, double* p1vz, double* p2vx, double* p2vy, double* p2vz, double* v1x, double* v1y, double* v1z
         ) {
             int tid = blockDim.x * blockIdx.x + threadIdx.x;
             
@@ -92,6 +92,7 @@ if FRAMEWORK == "CuPy":
             double k = '''+f'{k:.20f}'+''';
             double E = '''+f'{E:.400f}'+''';
             double t = '''+f'{t:.200f}'+''';
+            double s = '''+f'{t:.10f}'+''';
 
             double dx = p1x - p2x[tid];
             double dy = p1y - p2y[tid];
@@ -108,6 +109,16 @@ if FRAMEWORK == "CuPy":
                 p1vx[tid] = f * cos(alpha) * sin(beta);
                 p1vy[tid] = f * sin(alpha);
                 p1vz[tid] = f * cos(alpha) * cos(beta);
+                
+                if(r < s){
+                    v1x[tid] = ((p1m - p2m[tid]) * p1vxi + 2 * p2m[tid] * p2vx[tid]) / (p1m + p2m[tid]);
+                    v1y[tid] = ((p1m - p2m[tid]) * p1vyi + 2 * p2m[tid] * p2vy[tid]) / (p1m + p2m[tid]);
+                    v1z[tid] = ((p1m - p2m[tid]) * p1vzi + 2 * p2m[tid] * p2vz[tid]) / (p1m + p2m[tid]);
+                } else {
+                    v1x[tid] = 0.0;
+                    v1y[tid] = 0.0;
+                    v1z[tid] = 0.0;
+                }
             } else {
                 p1vx[tid] = 0.0;
                 p1vy[tid] = 0.0;
@@ -117,14 +128,15 @@ if FRAMEWORK == "CuPy":
 
 ######## NUMPY SETUP ########
 # function to calculate the acceleration of one particle on another given the distance, mass, and charge
-# returns a tuple of the component forces, in the format of (x,y,z)
+# returns a tuple of the component forces and (if collision) velocity, in the format of (x,y,z,vx,vy,vz)
 # p1x, p1y, p1z    - x, y, and z coordinates of particle 1
 # p1vx, p1vy, p1vz - x, y, and z component velocities of particle 1
 # p2x, p2y, p2z    - x, y, and z coordinates of particle 2
 # p1m, p2m         - masses of particles 1 and 2
 # p1q, p2q         - charges of particles 1 and 2
-@numba.njit(error_model="numpy", parallel=(FRAMEWORK=="NumPy-M"), fastmath=True)
-def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q):
+# p2vx, p2vy, p2vz - x, y, and z component velocities of particle 2
+@numba.njit(error_model="numpy", parallel=(FRAMEWORK=="NumPy-M"), fastmath=True, cache=True, nogil=True)
+def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q , p2vx, p2vy, p2vz):
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
     dz = p1z-p2z
@@ -144,7 +156,13 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     xforce = np.where(r==0, 0, f*np.cos(alpha)*np.sin(beta))
     yforce = np.where(r==0, 0, f*np.sin(alpha))
     zforce = np.where(r==0, 0, f*np.cos(alpha)*np.cos(beta))
-    return (xforce, yforce, zforce)
+
+    # check if collision occurs
+    v1x = np.where( (r < s) & (r != 0), (((p1m - p2m) * p1vx + 2 * p2m * p2vx) / (p1m + p2m)), 0)
+    v1y = np.where( (r < s) & (r != 0), (((p1m - p2m) * p1vy + 2 * p2m * p2vy) / (p1m + p2m)), 0)
+    v1z = np.where( (r < s) & (r != 0), (((p1m - p2m) * p1vz + 2 * p2m * p2vz) / (p1m + p2m)), 0)
+    
+    return (xforce, yforce, zforce, v1x, v1y, v1z)
 
 if FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
     getForce = np.vectorize(getForceNV) # vectorize the function
@@ -153,39 +171,66 @@ if FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
 def main():
     global px, py, pz, pvx, pvy, pvz, pq, pm # global variables
     for n in range(iterations):
-        if (n/iterations)*100 % 1 == 0:
-            print((n/iterations)*100)
+        if (n/iterations)*100 % 1 == 0 and n != 0:
+            now = round(time.time()-start_time,3)
+            left = round(now*iterations/n-now,3)
+            print((n/iterations)*100,"% complete\tETA:",str(left)+"s remaining ("+str(now)+"s elapsed)")
         
         if n % frequency == 0:
             end_process.append([n, px.tolist(), py.tolist(), pz.tolist()])
-
+        tmp_vx, tmp_vy, tmp_vz = pvx, pvy, pvz
         if FRAMEWORK == "NumPy-M":
             for cp in numba.prange(p):
-                chg_vx, chg_vy, chg_vz = getForceNV( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq )
+                chg_vx, chg_vy, chg_vz, cls_vx, cls_vy, cls_vz = getForceNV( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq, tmp_vx, tmp_vy, tmp_vz ) # get acceleration
+
+                # update variables
                 pvx[cp] = np.sum(chg_vx)+pvx[cp]
                 pvy[cp] = np.sum(chg_vy)+pvy[cp]
                 pvz[cp] = np.sum(chg_vz)+pvz[cp]
+
+                # if collision, update variables again
+                if np.sum(cls_vx) != 0:
+                    pvx[cp] = np.sum(cls_vx)
+                    pvy[cp] = np.sum(cls_vy)
+                    pvz[cp] = np.sum(cls_vz)
+                    
+            
         else:
             for cp in range(p): # calculate forces on each particle
 
                 if FRAMEWORK == "NumPy":
-                    chg_vx, chg_vy, chg_vz = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq ) # get acceleration
+                    chg_vx, chg_vy, chg_vz, cls_vx, cls_vy, cls_vz = getForce( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq, tmp_vx, tmp_vy, tmp_vz ) # get acceleration
 
                     # update variables
                     pvx[cp] = np.sum(chg_vx)+pvx[cp]
                     pvy[cp] = np.sum(chg_vy)+pvy[cp]
                     pvz[cp] = np.sum(chg_vz)+pvz[cp]
+
+                    # if collision, update variables again
+                    if np.sum(cls_vx) != 0:
+                        pvx[cp] = np.sum(cls_vx)
+                        pvy[cp] = np.sum(cls_vy)
+                        pvz[cp] = np.sum(cls_vz)
                 if FRAMEWORK == "CuPy":
                     chg_vx = np.zeros((p))
                     chg_vy = np.zeros((p))
                     chg_vz = np.zeros((p))
+                    cls_vx = np.zeros((p))
+                    cls_vy = np.zeros((p))
+                    cls_vz = np.zeros((p))
                     
-                    force_kernel((num_blocks,),(num_threads,),(float(px[cp]), float(py[cp]), float(pz[cp]), float(pm[cp]), float(pq[cp]), px, py, pz, pm, pq, chg_vx, chg_vy, chg_vz)) # get acceleration
+                    force_kernel((num_blocks,),(num_threads,),(float(px[cp]), float(py[cp]), float(pz[cp]), float(tmp_vx[cp]), float(tmp_vy[cp]), float(tmp_vz[cp]), float(pm[cp]), float(pq[cp]), px, py, pz, pm, pq, chg_vx, chg_vy, chg_vz, tmp_vx, tmp_vy, tmp_vz, cls_vx, cls_vy, cls_vz)) # get acceleration
 
                     # update variables
                     pvx[cp] = np.sum(chg_vx)+pvx[cp]
                     pvy[cp] = np.sum(chg_vy)+pvy[cp]
                     pvz[cp] = np.sum(chg_vz)+pvz[cp]
+                    
+                    # if collision, update variables again
+                    if np.sum(cls_vx) != 0:
+                        pvx[cp] = np.sum(cls_vx)
+                        pvy[cp] = np.sum(cls_vy)
+                        pvz[cp] = np.sum(cls_vz)
     
         # push particles with new velocities
         px += pvx
@@ -197,6 +242,7 @@ def main():
 # function to convert a 2D array into a video animation
 # frames - 2D array, with the first dimension representing individual frames, and the second dimension containing a counter and lists of x, y, and z coordinates
 def create_video(frames):
+    print("100.0% complete  \tProcessing...")
     import matplotlib as mp
     mp.use("agg") # alternatively, set backend of matplotlib to Tkinter ("TkAgg")
     import matplotlib.pyplot as plt
