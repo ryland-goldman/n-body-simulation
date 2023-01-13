@@ -55,22 +55,22 @@ else:
     raise RuntimeError("Please specify a valid framework.")
 
 ######## CONSTANTS ########
-G = 1000.0                 # gravitational constant
+G = 3000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
 E = sys.float_info.min     # softening constant
-t = 1e-3                  # time constant
+t = 1e-4                   # time constant
 p = int(1e2)               # particles
 s = 0.05                   # particle size
 
 ######## DATA STORAGE ########
-iterations = int(50)      # iterations of simulation
-frequency  = int(1e0)        # frequency of recording frames
-px = np.random.rand(p)*10  # x, y, z coordinates
-py = np.random.rand(p)*10  # x, y, z coordinates
-pz = np.random.rand(p)*10  # x, y, z coordinates
-pvx = np.zeros(p)*t        # component velocities: x, y, z
-pvy = np.zeros(p)*t        # component velocities: x, y, z
-pvz = np.zeros(p)*t        # component velocities: x, y, z
+iterations = int(1e4)      # iterations of simulation
+frequency  = int(5e1)      # frequency of recording frames
+px = np.random.rand(p)*7e2 # x, y, z coordinates
+py = np.random.rand(p)*7e2 # x, y, z coordinates
+pz = np.random.rand(p)*7e2 # x, y, z coordinates
+pvx = np.random.rand(p)*t*1e2# component velocities: x, y, z
+pvy = np.random.rand(p)*t*1e2# component velocities: x, y, z
+pvz = np.random.rand(p)*t*1e2# component velocities: x, y, z
 pq = np.ones(p)            # charge
 pm = np.ones(p)            # mass
 end_process = []           # list to store data which will be processed at the end
@@ -293,6 +293,21 @@ def create_video(frames):
         fig.update_layout(scene=dict(xaxis=dict(range=[min(data_x), max(data_x)],autorange=False),yaxis=dict(range=[min(data_y), max(data_y)],autorange=False),zaxis=dict(range=[min(data_z), max(data_z)],autorange=False)))
         fig.show()
 
+###### COMPILE #####
+print("Compiling...")
+precompile_time = time.time() # time before compilation
+if FRAMEWORK == "NumPy-M": tcvx, tcvy, tcvz, tclsvx, tclsvy, tclsvz = getForceNV( px[0], py[0], pz[0], pvx[0], pvy[0], pvz[0], pm[0], pq[0], px, py, pz, pm, pq, pvx, pvy, pvz )
+if FRAMEWORK == "NumPy": tcvx, tcvy, tcvz, tclsvx, tclsvy, tclsvz = getForce( px[0], py[0], pz[0], pvx[0], pvy[0], pvz[0], pm[0], pq[0], px, py, pz, pm, pq, pvx, pvy, pvz )
+if FRAMEWORK == "CuPy":
+    tchg_vx = np.zeros((p))
+    tchg_vy = np.zeros((p))
+    tchg_vz = np.zeros((p))
+    tcls_vx = np.zeros((p))
+    tcls_vy = np.zeros((p))
+    tcls_vz = np.zeros((p))       
+    force_kernel((num_blocks,),(num_threads,),(float(px[0]), float(py[0]), float(pz[0]), float(pvx[0]), float(pvy[0]), float(pvz[0]), float(pm[0]), float(pq[0]), px, py, pz, pm, pq, tchg_vx, tchg_vy, tchg_vz, pvx, pvy, pvz, tcls_vx, tcls_vy, tcls_vz))
+
+print("Beginning N-body simulation")
 start_time = time.time()    # start of program
 main()                      # run program
 midpoint_time = time.time() # runtime of program, exluding animation
@@ -302,6 +317,7 @@ end_time = time.time()      # runtime of program, including animation
 print("Program has completed running using",FRAMEWORK)
 if FRAMEWORK == "CuPy": print("Blocks/Threads:",num_blocks,"x",num_threads)
 print(p,"particles for",iterations,"frames, recording every",frequency,"frames")
+print("Time to compile functions:     ",math.floor((start_time-precompile_time)*100)/100," seconds")
 print("Time to run N-body simulation: ",math.floor((midpoint_time-start_time)*100)/100," seconds")
 print("Time to create animation:      ",math.floor((end_time-midpoint_time)*100)/100," seconds")
-print("Total time:                    ",math.floor((end_time-start_time)*100)/100," seconds")
+print("Total time:                    ",math.floor((end_time-precompile_time)*100)/100," seconds")
