@@ -26,6 +26,12 @@ https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-
 
 ## Daily Progress and Goals
 
+### 22 December 2022
+
+**Goals**: 1) Begin programming CUDA kernel
+
+Using the `CuPy.RawKernel` function, I created a CUDA kernel called `get_force` which is written using C++. The kernel, once compiled, will act in the same way as the `getForce` function (which uses the `NumPy` library). First, the function computes the process ID using the thread and block numbers (stored in the `tid` variable). Then, the constants are redefined (as the Python code is not executed on GPU subunits). The acceleration components are calculated in an identical manner to `getForce` and transmitted back to the CPU via a pointer. See commit [f239416](https://github.com/ryland-goldman/n-body-simulation/commit/f239416c174eb63271585a24e28c4d18ccce7b36).
+
 ### 16 December 2022
 
 **Goals**: 1) Fix slow performance of `NumPy` simulation
