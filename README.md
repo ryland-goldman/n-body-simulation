@@ -26,11 +26,23 @@ https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-
 
 ## Daily Progress and Goals
 
+### 13 January 2023
+
+**Goals**: 1) Enable pre-compilation of the `NumPy` and `CuPy` functions.
+
+The `NumPy` and `CuPy` functions need to be compiled before they are run. Since this is done using JIT (just-in-time) compilation, it happens at the moment they are first called. This slows down the simulation and can introduce another variable to the results. By calling the functions once before the timer starts, and therefore compiling them early, the variable can be eliminated. See commit [5a13b73](https://github.com/ryland-goldman/n-body-simulation/commit/5a13b730089e4f0db8e9a42eedfbcd50a3aebfe2).
+
+### 9 January 2023
+
+**Goals**: 1) Modify output of simulation to have an option to use `Plotly` library
+
+The variable `DISPLAY` now has three states. "Video" keeps the current behaviour (plotting with `matplotlib` and combining frames with `FFmpeg`). "Plot" uses the `Plotly` library to create an interactive web-browser based plot (note, the plot is stored to RAM, not to disk). "Both" makes a video and a plot. It creates a data frame with the `Pandas` library that is used to form a 3D scatter plot. `Plotly` is significantly faster than `matplotlib`. See commit [82de489](https://github.com/ryland-goldman/n-body-simulation/commit/82de4890aeef0a6e7d9e3ec125967975e75ff2e2).
+
 ### 8 January 2023
 
 **Goals**: 1) Add multithreading using `NumPy`, 2) clean up program code, 3) work on handling collisions
 
-The code now has a better interface, including providing a progress bar. I also added multithreading for the `NumPy` (CPU) N-body simulation. This was done using just-in-time (JIT) compilation provided by the `Numba` library. I cleaned up some of the code to make it more readable. Lastly, I think I finally got collisions to work succesfully (if the distance is less than the value in the `s` variable; collisions are assumed to be completely elastic).
+The code now has a better interface, including providing a progress bar. I also added multithreading for the `NumPy` (CPU) N-body simulation. This was done using just-in-time (JIT) compilation provided by the `Numba` library. I cleaned up some of the code to make it more readable. Lastly, I think I finally got collisions to work succesfully (if the distance is less than the value in the `s` variable; collisions are assumed to be completely elastic). See commit [7234bc4](https://github.com/ryland-goldman/n-body-simulation/commit/7234bc437218de0dcab76483cba8fd7f76142e37).
 
 ### 29 December 2022
 
