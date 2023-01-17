@@ -26,7 +26,13 @@ https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-
 
 ## Daily Progress and Goals
 
-### 26 December 2022
+### 8 January 2023
+
+**Goals**: 1) Add multithreading using `NumPy`, 2) clean up program code, 3) work on handling collisions
+
+The code now has a better interface, including providing a progress bar. I also added multithreading for the `NumPy` (CPU) N-body simulation. This was done using just-in-time (JIT) compilation provided by the `Numba` library. I cleaned up some of the code to make it more readable. Lastly, I think I finally got collisions to work succesfully (if the distance is less than the value in the `s` variable; collisions are assumed to be completely elastic).
+
+### 29 December 2022
 
 **Goals**: 1) Implement the `CuPy` kernel for force and acceleration calculations.
 
