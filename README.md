@@ -26,6 +26,12 @@ https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-
 
 ## Daily Progress and Goals
 
+### 26 December 2022
+
+**Goals**: 1) Implement the `CuPy` kernel for force and acceleration calculations.
+
+The kernel now works and is providing output to the CPU. End users can choose to set the global `FRAMEWORK` variable to either "CuPy" or "NumPy", depending on how the simulation should be run. "NumPy" keeps it as it has been before, meanwhile "CuPy" runs the previously defined CUDA kernel. I also made some minor modifications to the output of the program, such as using the `agg` backend of `matplotlib` instead of `TkAgg` for potentially better performance. See commit [e124b5a](https://github.com/ryland-goldman/n-body-simulation/commit/e124b5a2df768d225ab771d698338cd0b223b21b).
+
 ### 22 December 2022
 
 **Goals**: 1) Begin programming CUDA kernel
