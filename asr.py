@@ -32,7 +32,7 @@
 # SOFTWARE.           
 
 FRAMEWORK = "PyOpenCL"
-DISPLAY = "Plot"
+DISPLAY = "None"
 
 ######## LIBRARIES ########
 import os
@@ -49,8 +49,7 @@ elif FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
 elif FRAMEWORK == "PyOpenCL":
     import numpy as np    # import NumPy library
     import pyopencl as cl # import PyOpenCL library
-elif FRAMEWORK == "None":
-    raise NotImplementedError("A framework is currently required.")
+    import pyopencl.array as cl_array
 else:
     raise RuntimeError("Please specify a valid framework.")
 
@@ -58,22 +57,22 @@ else:
 G = 3000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
 E = sys.float_info.min     # softening constant
-t = 1e-4                   # time constant
-p = int(2)               # particles
+t = 1e-2                   # time constant
+p = int(4096)              # particles
 s = 0.05                   # particle size
 
 ######## DATA STORAGE ########
-iterations = int(10)      # iterations of simulation
-frequency  = int(1)      # frequency of recording frames
-px = np.random.rand(p)*7e2 # x, y, z coordinates
-py = np.random.rand(p)*7e2 # x, y, z coordinates
-pz = np.random.rand(p)*7e2 # x, y, z coordinates
+iterations = int(1)         # iterations of simulation
+frequency  = int(1)          # frequency of recording frames
+px = np.random.rand(p)*7e2   # x, y, z coordinates
+py = np.random.rand(p)*7e2   # x, y, z coordinates
+pz = np.random.rand(p)*7e2   # x, y, z coordinates
 pvx = np.random.rand(p)*t*1e2# component velocities: x, y, z
 pvy = np.random.rand(p)*t*1e2# component velocities: x, y, z
 pvz = np.random.rand(p)*t*1e2# component velocities: x, y, z
-pq = np.ones(p)            # charge
-pm = np.ones(p)            # mass
-end_process = []           # list to store data which will be processed at the end
+pq = np.ones(p)              # charge
+pm = np.ones(p)              # mass
+end_process = []             # list to store data which will be processed at the end
 
 ######## OPENCL SETUP ########
 if FRAMEWORK == "PyOpenCL":
@@ -81,57 +80,52 @@ if FRAMEWORK == "PyOpenCL":
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
-    prg = cl.Program(ctx, """
+    prg = cl.Program(ctx, """#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 __kernel void force(
-        __global const float *p1x_ptr,
-        __global const float *p1y_ptr,
-        __global const float *p1z_ptr,
-        __global const float *p1vxi_ptr,
-        __global const float *p1vyi_ptr,
-        __global const float *p1vzi_ptr,
-        __global const float *p1m_ptr,
-        __global const float *p1q_ptr,
-        __global const float *p2x,
-        __global const float *p2y,
-        __global const float *p2z,
-        __global const float *p2m,
-        __global const float *p2q,
-        __global float *p1vx,
-        __global float *p1vy,
-        __global float *p1vz,
-        __global const float *p2vx,
-        __global const float *p2vy,
-        __global const float *p2vz,
-        __global float *v1x,
-        __global float *v1y,
-        __global float *v1z
+        __global const int *cp_ptr,
+        __global const double *p2x,
+        __global const double *p2y,
+        __global const double *p2z,
+        __global const double *p2m,
+        __global const double *p2q,
+        __global double *p1vx,
+        __global double *p1vy,
+        __global double *p1vz,
+        __global const double *p2vx,
+        __global const double *p2vy,
+        __global const double *p2vz,
+        __global double *v1x,
+        __global double *v1y,
+        __global double *v1z
     ){
-        float p1x = p1x_ptr[0];
-        float p1y = p1y_ptr[0];
-        float p1z = p1z_ptr[0];
-        float p1vxi = p1vxi_ptr[0];
-        float p1vyi = p1vyi_ptr[0];
-        float p1vzi = p1vzi_ptr[0];
-        float p1m = p1m_ptr[0];
-        float p1q = p1q_ptr[0];
+        int cp = cp_ptr[0];
+        double p1x = p2x[cp];
+        double p1y = p2y[cp];
+        double p1z = p2z[cp];
+        double p1vxi = p2vx[cp];
+        double p1vyi = p2vy[cp];
+        double p1vzi = p2vz[cp];
+        double p1m = p2m[cp];
+        double p1q = p2q[cp];
         int tid = get_global_id(0);
             
-        float G = """+f'{G:.20f}'+""";
-        float k = """+f'{k:.20f}'+""";
-        float E = """+f'{E:.400f}'+""";
-        float t = """+f'{t:.200f}'+""";
-        float s = """+f'{s:.10f}'+""";
+        double G = """+f'{G:.20f}'+""";
+        double k = """+f'{k:.20f}'+""";
+        double E = """+f'{E:.400f}'+""";
+        double t = """+f'{t:.200f}'+""";
+        double s = """+f'{s:.10f}'+""";
 
-        float dx = p1x - p2x[tid];
-        float dy = p1y - p2y[tid];
-        float dz = p1z - p2z[tid];
+        double dx = p1x - p2x[tid];
+        double dy = p1y - p2y[tid];
+        double dz = p1z - p2z[tid];
             
-        float r = sqrt( dx*dx + dy*dy + dz*dz );
-        printf("Hello!");
+        double r = sqrt( dx*dx + dy*dy + dz*dz );
         if( r != 0.0 ){
-            float f = t * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/((r * r+E)*p1m);
-            float alpha = asin(dy/(r+E));
-            float beta = atan(dx/(dz+E));
+            double f_g = G * p1m * p2m[tid];
+            double f_e = k * p1q * p2q[tid];
+            double f = t * (f_g - f_e)/((r * r + E) * p1m);
+            double alpha = asin(dy/(r+E));
+            double beta = atan(dx/(dz+E));
 
             if(dx<0){ alpha = -alpha; }
             
@@ -219,7 +213,7 @@ if FRAMEWORK == "CuPy":
 # p1m, p2m         - masses of particles 1 and 2
 # p1q, p2q         - charges of particles 1 and 2
 # p2vx, p2vy, p2vz - x, y, and z component velocities of particle 2
-@numba.njit(error_model="numpy", parallel=(FRAMEWORK=="NumPy-M"), fastmath=True, cache=True, nogil=True)
+@numba.njit(error_model="numpy", parallel=(FRAMEWORK=="NumPy-M"), fastmath=True, cache=True, nogil=(FRAMEWORK=="NumPy-M"))
 def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q , p2vx, p2vy, p2vz):
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
@@ -263,6 +257,16 @@ def main():
         if n % frequency == 0:
             end_process.append([n, px.tolist(), py.tolist(), pz.tolist()])
         tmp_vx, tmp_vy, tmp_vz = pvx, pvy, pvz
+        if FRAMEWORK == "PyOpenCL":
+            # transfer data to OpenCL
+            px_g =   cl_array.to_device(queue, px)
+            py_g =   cl_array.to_device(queue, py)
+            pz_g =   cl_array.to_device(queue, pz)
+            pvxt_g =   cl_array.to_device(queue, tmp_vx)
+            pvyt_g =   cl_array.to_device(queue, tmp_vy)
+            pvzt_g =   cl_array.to_device(queue, tmp_vz)
+            pm_g =   cl_array.to_device(queue, pm)
+            pq_g =   cl_array.to_device(queue, pq)
         if FRAMEWORK == "NumPy-M":
             for cp in numba.prange(p):
                 chg_vx, chg_vy, chg_vz, cls_vx, cls_vy, cls_vz = getForceNV( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq, tmp_vx, tmp_vy, tmp_vz ) # get acceleration
@@ -317,48 +321,26 @@ def main():
                         pvz[cp] = np.sum(cls_vz)
                         
                 if FRAMEWORK == "PyOpenCL":
-
-                    # transfer data to opencl
-                    px_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=px)
-                    py_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=py)
-                    pz_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=pz)
-                    pvxt_g = cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=tmp_vx)
-                    pvyt_g = cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=tmp_vy)
-                    pvzt_g = cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=tmp_vz)
-                    pm_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=pm)
-                    pq_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=pq)
-                    chg_vxg =cl.Buffer(ctx, mf.WRITE_ONLY, pvx.nbytes)
-                    chg_vyg =cl.Buffer(ctx, mf.WRITE_ONLY, pvy.nbytes)
-                    chg_vzg =cl.Buffer(ctx, mf.WRITE_ONLY, pvz.nbytes)
-                    cls_vxg =cl.Buffer(ctx, mf.WRITE_ONLY, pvx.nbytes)
-                    cls_vyg =cl.Buffer(ctx, mf.WRITE_ONLY, pvy.nbytes)
-                    cls_vzg =cl.Buffer(ctx, mf.WRITE_ONLY, pvz.nbytes)
-                    chg_vx =  np.empty_like(pvx)
-                    chg_vy =  np.empty_like(pvy)
-                    chg_vz =  np.empty_like(pvz)
-                    cls_vx =  np.empty_like(pvx)
-                    cls_vy =  np.empty_like(pvy)
-                    cls_vz =  np.empty_like(pvz)
+                    # buffers for retrieving gpu data
+                    chg_vxg =  cl_array.empty_like(px_g)
+                    chg_vyg =  cl_array.empty_like(py_g)
+                    chg_vzg =  cl_array.empty_like(pz_g)
+                    cls_vxg =  cl_array.empty_like(px_g)
+                    cls_vyg =  cl_array.empty_like(py_g)
+                    cls_vzg =  cl_array.empty_like(pz_g)
+                    cp_g = cl_array.to_device(queue,np.array([cp]));
 
                     # calculate acceleration
                     prg.force(queue, px.shape, None,
-                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(px[cp]))),
-                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(py[cp]))),
-                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(pz[cp]))),
-                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(tmp_vx[cp]))),
-                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(tmp_vy[cp]))),
-                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(tmp_vz[cp]))),
-                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(pm[cp]))),
-                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(pq[cp]))),
-                              px_g, py_g, pz_g, pm_g, pq_g, chg_vxg, chg_vyg, chg_vzg, pvxt_g, pvyt_g, pvzt_g, cls_vxg, cls_vyg, cls_vzg)
+                              cp_g.data, px_g.data, py_g.data, pz_g.data, pm_g.data, pq_g.data, chg_vxg.data, chg_vyg.data, chg_vzg.data, pvxt_g.data, pvyt_g.data, pvzt_g.data, cls_vxg.data, cls_vyg.data, cls_vzg.data).wait()
 
                     # copy data to cpu
-                    cl.enqueue_copy(queue, chg_vx, chg_vxg)
-                    cl.enqueue_copy(queue, chg_vy, chg_vyg)
-                    cl.enqueue_copy(queue, chg_vz, chg_vzg)
-                    cl.enqueue_copy(queue, cls_vx, cls_vxg)
-                    cl.enqueue_copy(queue, cls_vy, cls_vyg)
-                    cl.enqueue_copy(queue, cls_vz, cls_vzg)
+                    chg_vx = chg_vxg.get()
+                    chg_vy = chg_vyg.get()
+                    chg_vz = chg_vzg.get()
+                    cls_vx = cls_vxg.get()
+                    cls_vy = cls_vyg.get()
+                    cls_vz = cls_vzg.get()
                     
                     # update variables
                     pvx[cp] = np.sum(chg_vx)+pvx[cp]
