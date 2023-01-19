@@ -31,7 +31,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.           
 
-FRAMEWORK = "NumPy-M"
+FRAMEWORK = "PyOpenCL"
 DISPLAY = "Plot"
 
 ######## LIBRARIES ########
@@ -47,7 +47,7 @@ if FRAMEWORK == "CuPy":
 elif FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
     import numpy as np    # import NumPy library
 elif FRAMEWORK == "PyOpenCL":
-    raise NotImplementedError("PyOpenCL has not yet been implemented")
+    import numpy as np    # import NumPy library
     import pyopencl as cl # import PyOpenCL library
 elif FRAMEWORK == "None":
     raise NotImplementedError("A framework is currently required.")
@@ -59,12 +59,12 @@ G = 3000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
 E = sys.float_info.min     # softening constant
 t = 1e-4                   # time constant
-p = int(1e2)               # particles
+p = int(2)               # particles
 s = 0.05                   # particle size
 
 ######## DATA STORAGE ########
-iterations = int(1e4)      # iterations of simulation
-frequency  = int(5e1)      # frequency of recording frames
+iterations = int(10)      # iterations of simulation
+frequency  = int(1)      # frequency of recording frames
 px = np.random.rand(p)*7e2 # x, y, z coordinates
 py = np.random.rand(p)*7e2 # x, y, z coordinates
 pz = np.random.rand(p)*7e2 # x, y, z coordinates
@@ -74,6 +74,87 @@ pvz = np.random.rand(p)*t*1e2# component velocities: x, y, z
 pq = np.ones(p)            # charge
 pm = np.ones(p)            # mass
 end_process = []           # list to store data which will be processed at the end
+
+######## OPENCL SETUP ########
+if FRAMEWORK == "PyOpenCL":
+    if E < pow(2,-129): E = pow(2,-129)
+    ctx = cl.create_some_context()
+    queue = cl.CommandQueue(ctx)
+    mf = cl.mem_flags
+    prg = cl.Program(ctx, """
+__kernel void force(
+        __global const float *p1x_ptr,
+        __global const float *p1y_ptr,
+        __global const float *p1z_ptr,
+        __global const float *p1vxi_ptr,
+        __global const float *p1vyi_ptr,
+        __global const float *p1vzi_ptr,
+        __global const float *p1m_ptr,
+        __global const float *p1q_ptr,
+        __global const float *p2x,
+        __global const float *p2y,
+        __global const float *p2z,
+        __global const float *p2m,
+        __global const float *p2q,
+        __global float *p1vx,
+        __global float *p1vy,
+        __global float *p1vz,
+        __global const float *p2vx,
+        __global const float *p2vy,
+        __global const float *p2vz,
+        __global float *v1x,
+        __global float *v1y,
+        __global float *v1z
+    ){
+        float p1x = p1x_ptr[0];
+        float p1y = p1y_ptr[0];
+        float p1z = p1z_ptr[0];
+        float p1vxi = p1vxi_ptr[0];
+        float p1vyi = p1vyi_ptr[0];
+        float p1vzi = p1vzi_ptr[0];
+        float p1m = p1m_ptr[0];
+        float p1q = p1q_ptr[0];
+        int tid = get_global_id(0);
+            
+        float G = """+f'{G:.20f}'+""";
+        float k = """+f'{k:.20f}'+""";
+        float E = """+f'{E:.400f}'+""";
+        float t = """+f'{t:.200f}'+""";
+        float s = """+f'{s:.10f}'+""";
+
+        float dx = p1x - p2x[tid];
+        float dy = p1y - p2y[tid];
+        float dz = p1z - p2z[tid];
+            
+        float r = sqrt( dx*dx + dy*dy + dz*dz );
+        printf("Hello!");
+        if( r != 0.0 ){
+            float f = t * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/((r * r+E)*p1m);
+            float alpha = asin(dy/(r+E));
+            float beta = atan(dx/(dz+E));
+
+            if(dx<0){ alpha = -alpha; }
+            
+            p1vx[tid] = f * cos(alpha) * sin(beta);
+            p1vy[tid] = f * sin(alpha);
+            p1vz[tid] = f * cos(alpha) * cos(beta);
+                
+            if(r < s){
+                v1x[tid] = ((p1m - p2m[tid]) * p1vxi + 2 * p2m[tid] * p2vx[tid]) / (p1m + p2m[tid]);
+                v1y[tid] = ((p1m - p2m[tid]) * p1vyi + 2 * p2m[tid] * p2vy[tid]) / (p1m + p2m[tid]);
+                v1z[tid] = ((p1m - p2m[tid]) * p1vzi + 2 * p2m[tid] * p2vz[tid]) / (p1m + p2m[tid]);
+            } else {
+                v1x[tid] = 0.0;
+                v1y[tid] = 0.0;
+                v1z[tid] = 0.0;
+            }
+        } else {
+            p1vx[tid] = 0.0;
+            p1vy[tid] = 0.0;
+            p1vz[tid] = 0.0;
+        }
+    }""").build()
+
 
 ######## CUDA SETUP ########
 if FRAMEWORK == "CuPy":
@@ -95,7 +176,7 @@ if FRAMEWORK == "CuPy":
             double k = '''+f'{k:.20f}'+''';
             double E = '''+f'{E:.400f}'+''';
             double t = '''+f'{t:.200f}'+''';
-            double s = '''+f'{t:.10f}'+''';
+            double s = '''+f'{s:.10f}'+''';
 
             double dx = p1x - p2x[tid];
             double dy = p1y - p2y[tid];
@@ -224,6 +305,61 @@ def main():
                     
                     force_kernel((num_blocks,),(num_threads,),(float(px[cp]), float(py[cp]), float(pz[cp]), float(tmp_vx[cp]), float(tmp_vy[cp]), float(tmp_vz[cp]), float(pm[cp]), float(pq[cp]), px, py, pz, pm, pq, chg_vx, chg_vy, chg_vz, tmp_vx, tmp_vy, tmp_vz, cls_vx, cls_vy, cls_vz)) # get acceleration
 
+                    # update variables
+                    pvx[cp] = np.sum(chg_vx)+pvx[cp]
+                    pvy[cp] = np.sum(chg_vy)+pvy[cp]
+                    pvz[cp] = np.sum(chg_vz)+pvz[cp]
+                    
+                    # if collision, update variables again
+                    if np.sum(cls_vx) != 0:
+                        pvx[cp] = np.sum(cls_vx)
+                        pvy[cp] = np.sum(cls_vy)
+                        pvz[cp] = np.sum(cls_vz)
+                        
+                if FRAMEWORK == "PyOpenCL":
+
+                    # transfer data to opencl
+                    px_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=px)
+                    py_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=py)
+                    pz_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=pz)
+                    pvxt_g = cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=tmp_vx)
+                    pvyt_g = cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=tmp_vy)
+                    pvzt_g = cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=tmp_vz)
+                    pm_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=pm)
+                    pq_g =   cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=pq)
+                    chg_vxg =cl.Buffer(ctx, mf.WRITE_ONLY, pvx.nbytes)
+                    chg_vyg =cl.Buffer(ctx, mf.WRITE_ONLY, pvy.nbytes)
+                    chg_vzg =cl.Buffer(ctx, mf.WRITE_ONLY, pvz.nbytes)
+                    cls_vxg =cl.Buffer(ctx, mf.WRITE_ONLY, pvx.nbytes)
+                    cls_vyg =cl.Buffer(ctx, mf.WRITE_ONLY, pvy.nbytes)
+                    cls_vzg =cl.Buffer(ctx, mf.WRITE_ONLY, pvz.nbytes)
+                    chg_vx =  np.empty_like(pvx)
+                    chg_vy =  np.empty_like(pvy)
+                    chg_vz =  np.empty_like(pvz)
+                    cls_vx =  np.empty_like(pvx)
+                    cls_vy =  np.empty_like(pvy)
+                    cls_vz =  np.empty_like(pvz)
+
+                    # calculate acceleration
+                    prg.force(queue, px.shape, None,
+                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(px[cp]))),
+                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(py[cp]))),
+                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(pz[cp]))),
+                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(tmp_vx[cp]))),
+                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(tmp_vy[cp]))),
+                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(tmp_vz[cp]))),
+                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(pm[cp]))),
+                              cl.Buffer(ctx, mf.READ_ONLY| mf.COPY_HOST_PTR, hostbuf=np.array(float(pq[cp]))),
+                              px_g, py_g, pz_g, pm_g, pq_g, chg_vxg, chg_vyg, chg_vzg, pvxt_g, pvyt_g, pvzt_g, cls_vxg, cls_vyg, cls_vzg)
+
+                    # copy data to cpu
+                    cl.enqueue_copy(queue, chg_vx, chg_vxg)
+                    cl.enqueue_copy(queue, chg_vy, chg_vyg)
+                    cl.enqueue_copy(queue, chg_vz, chg_vzg)
+                    cl.enqueue_copy(queue, cls_vx, cls_vxg)
+                    cl.enqueue_copy(queue, cls_vy, cls_vyg)
+                    cl.enqueue_copy(queue, cls_vz, cls_vzg)
+                    
                     # update variables
                     pvx[cp] = np.sum(chg_vx)+pvx[cp]
                     pvy[cp] = np.sum(chg_vy)+pvy[cp]
