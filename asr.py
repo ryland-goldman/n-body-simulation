@@ -46,7 +46,7 @@ if FRAMEWORK == "CuPy":
     import cupy as np     # import CuPy library
 elif FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
     import numpy as np    # import NumPy library
-elif FRAMEWORK == "PyOpenCL":
+elif FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
     import numpy as np    # import NumPy library
     import pyopencl as cl # import PyOpenCL library
     import pyopencl.array as cl_array
@@ -58,7 +58,7 @@ G = 3000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
 E = sys.float_info.min     # softening constant
 t = 1e-2                   # time constant
-p = int(4096)              # particles
+p = int(8192)              # particles
 s = 0.05                   # particle size
 
 ######## DATA STORAGE ########
@@ -75,9 +75,18 @@ pm = np.ones(p)              # mass
 end_process = []             # list to store data which will be processed at the end
 
 ######## OPENCL SETUP ########
-if FRAMEWORK == "PyOpenCL":
+if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
+    platform = cl.get_platforms()
+    if FRAMEWORK == "PyOpenCL-GPU":
+        devices = platform[0].get_devices(device_type=cl.device_type.GPU)
+    elif FRAMEWORK == "PyOpenCL-CPU":
+        devices = platform[1].get_devices(device_type=cl.device_type.CPU)
+    PYOPENCL_COMPILER_OUTPUT = 1
     if E < pow(2,-129): E = pow(2,-129)
-    ctx = cl.create_some_context()
+    if FRAMEWORK == "PyOpenCL":
+        ctx = cl.create_some_context()
+    else:
+        ctx = cl.Context(devices=devices)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     prg = cl.Program(ctx, """#pragma OPENCL EXTENSION cl_khr_fp64 : enable
@@ -257,7 +266,7 @@ def main():
         if n % frequency == 0:
             end_process.append([n, px.tolist(), py.tolist(), pz.tolist()])
         tmp_vx, tmp_vy, tmp_vz = pvx, pvy, pvz
-        if FRAMEWORK == "PyOpenCL":
+        if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
             # transfer data to OpenCL
             px_g =   cl_array.to_device(queue, px)
             py_g =   cl_array.to_device(queue, py)
@@ -320,7 +329,7 @@ def main():
                         pvy[cp] = np.sum(cls_vy)
                         pvz[cp] = np.sum(cls_vz)
                         
-                if FRAMEWORK == "PyOpenCL":
+                if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
                     # buffers for retrieving gpu data
                     chg_vxg =  cl_array.empty_like(px_g)
                     chg_vyg =  cl_array.empty_like(py_g)
