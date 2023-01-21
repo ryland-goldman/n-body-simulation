@@ -31,32 +31,40 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.           
 
-FRAMEWORK = "PyOpenCL"
+######## GLOBALS ########
+# FRAMEWORK options:
+#    CuPy         - Use the CuPy library for multithreading with a GPU via CUDA
+#    NumPy        - Use the NumPy library for a single-thread on the CPU
+#    NumPy-M      - Uses NumPy plus Numba for multithreading on the CPU
+#    PyOpenCL     - Any device running OpenCL
+#    PyOpenCL-CPU - Forces OpenCL to run on the CPU
+#    PyOpenCL-GPU - Forces OpenCL to run on the GPU
+# DISPLAY options:
+#    None         - No output
+#    Plot         - Interactive, animated plot with Plotly (faster)
+#    Video        - MP4 video output with Matplotlib/FFmpeg (slower)
+#    Both         - Creates a plot and a video
+FRAMEWORK = "NumPy-M"
 DISPLAY = "None"
 
 ######## LIBRARIES ########
-import os
-import sys
-import math
-import time
-import numba
-import pandas
-import plotly.express as plotlyx
-if FRAMEWORK == "CuPy":
-    import cupy as np     # import CuPy library
-elif FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
-    import numpy as np    # import NumPy library
+import os     # For running FFmpeg and saving a generated video to the disk
+import time   # For measuring the time
+import numba  # For wrapping getForceNV function
+import pandas # Required for Plotly
+import plotly.express as plotlyx # For plotting
+if FRAMEWORK == "CuPy": import cupy as np                                 # import CuPy library if needed
+elif FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":  import numpy as np  # import NumPy library if needed
 elif FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
-    import numpy as np    # import NumPy library
-    import pyopencl as cl # import PyOpenCL library
-    import pyopencl.array as cl_array
-else:
-    raise RuntimeError("Please specify a valid framework.")
+    import numpy as np                                                    # import NumPy library
+    import pyopencl as cl                                                 # import PyOpenCL library
+    import pyopencl.array as cl_array                                     # import array from PyOpenCL
+else: raise RuntimeError("Please specify a valid framework.")             # if no framework is specified, raise an error
 
 ######## CONSTANTS ########
 G = 3000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
-E = sys.float_info.min     # softening constant
+E = pow(2,-128)            # softening constant
 t = 1e-2                   # time constant
 p = int(8192)              # particles
 s = 0.05                   # particle size
@@ -77,36 +85,49 @@ end_process = []             # list to store data which will be processed at the
 ######## OPENCL SETUP ########
 if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
     platform = cl.get_platforms()
+    
+    # Only select GPUs from platform 0
     if FRAMEWORK == "PyOpenCL-GPU":
         devices = platform[0].get_devices(device_type=cl.device_type.GPU)
+
+    # Only select CPUs from platform 1
     elif FRAMEWORK == "PyOpenCL-CPU":
         devices = platform[1].get_devices(device_type=cl.device_type.CPU)
-    PYOPENCL_COMPILER_OUTPUT = 1
-    if E < pow(2,-129): E = pow(2,-129)
+
+    # FP32 compatibility
+    if E < pow(2,-128): E = pow(2,-128)
+    
     if FRAMEWORK == "PyOpenCL":
+        # User selects device
         ctx = cl.create_some_context()
     else:
+        # Use pre-selected device
         ctx = cl.Context(devices=devices)
-    queue = cl.CommandQueue(ctx)
-    mf = cl.mem_flags
-    prg = cl.Program(ctx, """#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+
+    queue = cl.CommandQueue(ctx) # OpenCL command queue
+    mf = cl.mem_flags            # Memory flags
+    prg = cl.Program(ctx, r"""
+// Enable OpenCL extension for double-precision FP64
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+
 __kernel void force(
-        __global const int *cp_ptr,
-        __global const double *p2x,
-        __global const double *p2y,
-        __global const double *p2z,
-        __global const double *p2m,
-        __global const double *p2q,
-        __global double *p1vx,
-        __global double *p1vy,
-        __global double *p1vz,
-        __global const double *p2vx,
-        __global const double *p2vy,
-        __global const double *p2vz,
-        __global double *v1x,
-        __global double *v1y,
-        __global double *v1z
+        __global const int *cp_ptr,   // Pointer for the integer index of the current particle in the array
+        __global const double *p2x,   // X-coordinate array of all particles
+        __global const double *p2y,   // Y-coordinate array of all particles
+        __global const double *p2z,   // Z-coordinate array of all particles
+        __global const double *p2m,   // Mass of all particles
+        __global const double *p2q,   // Charge of all particles
+        __global double *p1vx,        // Modifiable array of partial component velocities in the x direction
+        __global double *p1vy,        // Modifiable array of partial component velocities in the y direction
+        __global double *p1vz,        // Modifiable array of partial component velocities in the z direction
+        __global const double *p2vx,  // X component direction of all particle velocities
+        __global const double *p2vy,  // Y component direction of all particle velocities
+        __global const double *p2vz,  // Z component direction of all particle velocities
+        __global double *v1x,         // Contains new velocitiy in the x direction if a collision occured, otherwise zero
+        __global double *v1y,         // Contains new velocitiy in the x direction if a collision occured, otherwise zero
+        __global double *v1z          // Contains new velocitiy in the x direction if a collision occured, otherwise zero
     ){
+        // Fetch current particle information using data from cp_ptr
         int cp = cp_ptr[0];
         double p1x = p2x[cp];
         double p1y = p2y[cp];
@@ -116,32 +137,41 @@ __kernel void force(
         double p1vzi = p2vz[cp];
         double p1m = p2m[cp];
         double p1q = p2q[cp];
-        int tid = get_global_id(0);
-            
-        double G = """+f'{G:.20f}'+""";
-        double k = """+f'{k:.20f}'+""";
-        double E = """+f'{E:.400f}'+""";
-        double t = """+f'{t:.200f}'+""";
-        double s = """+f'{s:.10f}'+""";
 
+        // Get ID of current thread
+        int tid = get_global_id(0);
+
+        // Import constants from Python
+        double G = """+f'{G:.20f}'+r""";
+        double k = """+f'{k:.20f}'+r""";
+        double E = """+f'{E:.400f}'+r""";
+        double t = """+f'{t:.200f}'+r""";
+        double s = """+f'{s:.10f}'+r""";
+
+        // Calculate differences in position
         double dx = p1x - p2x[tid];
         double dy = p1y - p2y[tid];
         double dz = p1z - p2z[tid];
-            
-        double r = sqrt( dx*dx + dy*dy + dz*dz );
-        if( r != 0.0 ){
-            double f_g = G * p1m * p2m[tid];
-            double f_e = k * p1q * p2q[tid];
-            double f = t * (f_g - f_e)/((r * r + E) * p1m);
-            double alpha = asin(dy/(r+E));
-            double beta = atan(dx/(dz+E));
 
-            if(dx<0){ alpha = -alpha; }
-            
+        // Calculate total distance with distance formula
+        double r = sqrt( dx*dx + dy*dy + dz*dz );
+
+        // Check if particles are different. If so, continue. If not, skip the particle.
+        if( r != 0.0 ){
+            double f_g = G * p1m * p2m[tid];  // Force from gravity
+            double f_e = k * p1q * p2q[tid];  // Force from electromagnetsim
+            double f = t * (f_g - f_e)/((r * r + E) * p1m);  // Net acceleration 
+            double alpha = asin(dy/(r+E));    // Calculate angle alpha
+            double beta = atan(dx/(dz+E));    // Calculate angle beta
+
+            if(dx<0){ alpha = -alpha; }       // If dx is negative, alpha flips
+
+            // Calculate acceleration components
             p1vx[tid] = f * cos(alpha) * sin(beta);
             p1vy[tid] = f * sin(alpha);
             p1vz[tid] = f * cos(alpha) * cos(beta);
-                
+
+            // If a collision occured, set the new velocities assuming perfectly elastic collisions
             if(r < s){
                 v1x[tid] = ((p1m - p2m[tid]) * p1vxi + 2 * p2m[tid] * p2vx[tid]) / (p1m + p2m[tid]);
                 v1y[tid] = ((p1m - p2m[tid]) * p1vyi + 2 * p2m[tid] * p2vy[tid]) / (p1m + p2m[tid]);
@@ -170,6 +200,10 @@ if FRAMEWORK == "CuPy":
     force_kernel = np.RawKernel(
         r'''#include <cuda_runtime.h>
         extern "C" __global__
+
+        /*
+         * For comments, please see the OpenCL implementation above.
+         * /
         void force_kernel(
             double p1x, double p1y, double p1z, double p1vxi, double p1vyi, double p1vzi, double p1m, double p1q, double* p2x, double* p2y, double* p2z, double* p2m, double* p2q, double* p1vx, double* p1vy, double* p1vz, double* p2vx, double* p2vy, double* p2vz, double* v1x, double* v1y, double* v1z
         ) {
@@ -258,14 +292,20 @@ if FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
 def main():
     global px, py, pz, pvx, pvy, pvz, pq, pm # global variables
     for n in range(iterations):
+
+        # print out status
         if (n/iterations)*100 % 1 == 0 and n != 0:
             now = round(time.time()-start_time,3)
             left = round(now*iterations/n-now,3)
             print((n/iterations)*100,"% complete\tETA:",str(left)+"s remaining ("+str(now)+"s elapsed)")
-        
+
+        # add frame to plot/video
         if n % frequency == 0:
             end_process.append([n, px.tolist(), py.tolist(), pz.tolist()])
+
+        # temporary velocities
         tmp_vx, tmp_vy, tmp_vz = pvx, pvy, pvz
+
         if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
             # transfer data to OpenCL
             px_g =   cl_array.to_device(queue, px)
@@ -276,8 +316,9 @@ def main():
             pvzt_g =   cl_array.to_device(queue, tmp_vz)
             pm_g =   cl_array.to_device(queue, pm)
             pq_g =   cl_array.to_device(queue, pq)
+            
         if FRAMEWORK == "NumPy-M":
-            for cp in numba.prange(p):
+            for cp in numba.prange(p): # calculate forces on each particle
                 chg_vx, chg_vy, chg_vz, cls_vx, cls_vy, cls_vz = getForceNV( px[cp], py[cp], pz[cp], pvx[cp], pvy[cp], pvz[cp], pm[cp], pq[cp], px, py, pz, pm, pq, tmp_vx, tmp_vy, tmp_vz ) # get acceleration
 
                 # update variables
@@ -308,6 +349,7 @@ def main():
                         pvx[cp] = np.sum(cls_vx)
                         pvy[cp] = np.sum(cls_vy)
                         pvz[cp] = np.sum(cls_vz)
+                        
                 if FRAMEWORK == "CuPy":
                     chg_vx = np.zeros((p))
                     chg_vy = np.zeros((p))
@@ -403,11 +445,14 @@ def create_video(frames):
         for f in filelist:
             os.remove(os.path.join("C:\\Nbody\\files\\", f))
     if DISPLAY == 'Plot' or DISPLAY == 'Both':
+        # array for coordinates, particles, and frames
         data_x = []
         data_y = []
         data_z = []
         data_p = []
         data_f = []
+
+        # add numpy data to arrays
         for frame in frames:
             for p in range(len(frame[1])):
                 data_x.append(frame[1][p])
@@ -415,6 +460,8 @@ def create_video(frames):
                 data_z.append(frame[3][p])
                 data_p.append(p)
                 data_f.append(frame[0])
+
+        # create data frame and scatter plot, then display in web browser
         data = pandas.DataFrame(data={'x':data_x,'y':data_y,'z':data_z,'f':data_f,'p':data_p})
         fig = plotlyx.scatter_3d(data, x='x', y='y', z='z', animation_frame='f', animation_group='p')
         fig.update_layout(scene=dict(xaxis=dict(range=[min(data_x), max(data_x)],autorange=False),yaxis=dict(range=[min(data_y), max(data_y)],autorange=False),zaxis=dict(range=[min(data_z), max(data_z)],autorange=False)))
@@ -444,7 +491,7 @@ end_time = time.time()      # runtime of program, including animation
 print("Program has completed running using",FRAMEWORK)
 if FRAMEWORK == "CuPy": print("Blocks/Threads:",num_blocks,"x",num_threads)
 print(p,"particles for",iterations,"frames, recording every",frequency,"frames")
-print("Time to compile functions:     ",math.floor((start_time-precompile_time)*100)/100," seconds")
-print("Time to run N-body simulation: ",math.floor((midpoint_time-start_time)*100)/100," seconds")
-print("Time to create animation:      ",math.floor((end_time-midpoint_time)*100)/100," seconds")
-print("Total time:                    ",math.floor((end_time-precompile_time)*100)/100," seconds")
+print("Time to compile functions:     ",(((start_time-precompile_time)*100)//1)/100," seconds")
+print("Time to run N-body simulation: ",(((midpoint_time-start_time)*100)//1)/100," seconds")
+print("Time to create animation:      ",(((end_time-midpoint_time)*100)//1)/100," seconds")
+print("Total time:                    ",(((end_time-precompile_time)*100)//1)/100," seconds")
