@@ -44,8 +44,20 @@
 #    Plot         - Interactive, animated plot with Plotly (faster)
 #    Video        - MP4 video output with Matplotlib/FFmpeg (slower)
 #    Both         - Creates a plot and a video
-FRAMEWORK = "NumPy-M"
-DISPLAY = "None"
+# OUTPUT options:
+#    0            - Nothing logged to console
+#    1            - Only simulation runtime logged to console
+#    2            - Show full end output
+#    3            - Show full end output and progress
+import sys
+if not sys.stdin.isatty():
+    FRAMEWORK = sys.argv[1]
+    DISPLAY = sys.argv[2]
+    OUTPUT = 1
+else:
+    FRAMEWORK = "PyOpenCL-CPU"
+    DISPLAY = "Plot"
+    OUTPUT = 3
 
 ######## LIBRARIES ########
 import os     # For running FFmpeg and saving a generated video to the disk
@@ -66,11 +78,12 @@ G = 3000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
 E = pow(2,-128)            # softening constant
 t = 1e-2                   # time constant
-p = int(8192)              # particles
+p = int(4096)              # particles
 s = 0.05                   # particle size
+if not sys.stdin.isatty(): p = int(sys.argv[4])
 
 ######## DATA STORAGE ########
-iterations = int(1)         # iterations of simulation
+iterations = int(5)          # iterations of simulation
 frequency  = int(1)          # frequency of recording frames
 px = np.random.rand(p)*7e2   # x, y, z coordinates
 py = np.random.rand(p)*7e2   # x, y, z coordinates
@@ -81,9 +94,14 @@ pvz = np.random.rand(p)*t*1e2# component velocities: x, y, z
 pq = np.ones(p)              # charge
 pm = np.ones(p)              # mass
 end_process = []             # list to store data which will be processed at the end
+if not sys.stdin.isatty(): iterations = int(sys.argv[3])
 
 ######## OPENCL SETUP ########
 if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
+    # for some reason, the opencl setup causes an error
+    import warnings
+    warnings.filterwarnings("ignore")
+
     platform = cl.get_platforms()
     
     # Only select GPUs from platform 0
@@ -191,11 +209,11 @@ __kernel void force(
 
 ######## CUDA SETUP ########
 if FRAMEWORK == "CuPy":
-    num_blocks = 10
-    num_threads = 1000
+    num_blocks = 16
+    num_threads = 1024
 
-    if p > (num_blocks * num_threads):
-        raise RuntimeError("Invalid number of blocks and threads.")
+    #if p > (num_blocks * num_threads):
+    #    raise RuntimeError("Invalid number of blocks and threads.")
 
     force_kernel = np.RawKernel(
         r'''#include <cuda_runtime.h>
@@ -203,7 +221,7 @@ if FRAMEWORK == "CuPy":
 
         /*
          * For comments, please see the OpenCL implementation above.
-         * /
+         */
         void force_kernel(
             double p1x, double p1y, double p1z, double p1vxi, double p1vyi, double p1vzi, double p1m, double p1q, double* p2x, double* p2y, double* p2z, double* p2m, double* p2q, double* p1vx, double* p1vy, double* p1vz, double* p2vx, double* p2vy, double* p2vz, double* v1x, double* v1y, double* v1z
         ) {
@@ -212,7 +230,7 @@ if FRAMEWORK == "CuPy":
             double G = '''+f'{G:.20f}'+''';
             double k = '''+f'{k:.20f}'+''';
             double E = '''+f'{E:.400f}'+''';
-            double t = '''+f'{t:.200f}'+''';
+            double t = '''+f'{t:.200f}'+'''; 
             double s = '''+f'{s:.10f}'+''';
 
             double dx = p1x - p2x[tid];
@@ -256,7 +274,7 @@ if FRAMEWORK == "CuPy":
 # p1m, p2m         - masses of particles 1 and 2
 # p1q, p2q         - charges of particles 1 and 2
 # p2vx, p2vy, p2vz - x, y, and z component velocities of particle 2
-@numba.njit(error_model="numpy", parallel=(FRAMEWORK=="NumPy-M"), fastmath=True, cache=True, nogil=(FRAMEWORK=="NumPy-M"))
+@numba.njit(error_model="numpy", parallel=(FRAMEWORK=="NumPy-M"), fastmath=True, cache=True)
 def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2q , p2vx, p2vy, p2vz):
     dx = p1x-p2x # distances between particles in each direction
     dy = p1y-p2y
@@ -286,7 +304,7 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     return (xforce, yforce, zforce, v1x, v1y, v1z)
 
 if FRAMEWORK == "NumPy" or FRAMEWORK == "NumPy-M":
-    getForce = np.vectorize(getForceNV) # vectorize the function
+    getForce = np.frompyfunc(getForceNV,16,6) # vectorize the function
 
 ######## MAIN PROGRAM FUNCTION ########
 def main():
@@ -294,7 +312,7 @@ def main():
     for n in range(iterations):
 
         # print out status
-        if (n/iterations)*100 % 1 == 0 and n != 0:
+        if (n/iterations)*100 % 1 == 0 and n != 0 and OUTPUT == 3:
             now = round(time.time()-start_time,3)
             left = round(now*iterations/n-now,3)
             print((n/iterations)*100,"% complete\tETA:",str(left)+"s remaining ("+str(now)+"s elapsed)")
@@ -414,7 +432,8 @@ def main():
 # function to convert a 2D array into a video animation
 # frames - 2D array, with the first dimension representing individual frames, and the second dimension containing a counter and lists of x, y, and z coordinates
 def create_video(frames):
-    print("100.0% complete  \tProcessing...")
+    if OUTPUT == 3:
+        print("100.0% complete  \tProcessing...")
     if DISPLAY == 'Video' or DISPLAY == 'Both':
         import matplotlib as mp
         mp.use("agg") # alternatively, set backend of matplotlib to Tkinter ("TkAgg")
@@ -468,7 +487,8 @@ def create_video(frames):
         fig.show()
 
 ###### COMPILE #####
-print("Compiling...")
+if OUTPUT >= 2:
+    print("Compiling...")
 precompile_time = time.time() # time before compilation
 if FRAMEWORK == "NumPy-M": tcvx, tcvy, tcvz, tclsvx, tclsvy, tclsvz = getForceNV( px[0], py[0], pz[0], pvx[0], pvy[0], pvz[0], pm[0], pq[0], px, py, pz, pm, pq, pvx, pvy, pvz )
 if FRAMEWORK == "NumPy": tcvx, tcvy, tcvz, tclsvx, tclsvy, tclsvz = getForce( px[0], py[0], pz[0], pvx[0], pvy[0], pvz[0], pm[0], pq[0], px, py, pz, pm, pq, pvx, pvy, pvz )
@@ -481,17 +501,21 @@ if FRAMEWORK == "CuPy":
     tcls_vz = np.zeros((p))       
     force_kernel((num_blocks,),(num_threads,),(float(px[0]), float(py[0]), float(pz[0]), float(pvx[0]), float(pvy[0]), float(pvz[0]), float(pm[0]), float(pq[0]), px, py, pz, pm, pq, tchg_vx, tchg_vy, tchg_vz, pvx, pvy, pvz, tcls_vx, tcls_vy, tcls_vz))
 
-print("Beginning N-body simulation")
+if OUTPUT >= 2:
+    print("Beginning N-body simulation")
 start_time = time.time()    # start of program
 main()                      # run program
 midpoint_time = time.time() # runtime of program, exluding animation
 create_video(end_process)   # create animation
 end_time = time.time()      # runtime of program, including animation
 
-print("Program has completed running using",FRAMEWORK)
-if FRAMEWORK == "CuPy": print("Blocks/Threads:",num_blocks,"x",num_threads)
-print(p,"particles for",iterations,"frames, recording every",frequency,"frames")
-print("Time to compile functions:     ",(((start_time-precompile_time)*100)//1)/100," seconds")
-print("Time to run N-body simulation: ",(((midpoint_time-start_time)*100)//1)/100," seconds")
-print("Time to create animation:      ",(((end_time-midpoint_time)*100)//1)/100," seconds")
-print("Total time:                    ",(((end_time-precompile_time)*100)//1)/100," seconds")
+if OUTPUT >= 2:
+    print("Program has completed running using",FRAMEWORK)
+if FRAMEWORK == "CuPy" and OUTPUT >= 2: print("Blocks/Threads:",num_blocks,"x",num_threads)
+if OUTPUT >= 2:
+    print(p,"particles for",iterations,"frames, recording every",frequency,"frames")
+    print("Time to compile functions:     ",(((start_time-precompile_time)*100)//1)/100," seconds")
+    print("Time to run N-body simulation: ",(((midpoint_time-start_time)*100)//1)/100," seconds")
+    print("Time to create animation:      ",(((end_time-midpoint_time)*100)//1)/100," seconds")
+    print("Total time:                    ",(((end_time-precompile_time)*100)//1)/100," seconds")
+if OUTPUT == 1: print(midpoint_time-start_time)
