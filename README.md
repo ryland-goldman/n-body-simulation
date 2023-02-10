@@ -2,19 +2,19 @@
 
 2022-23 Synopsys Research Project
 
+Project Number 112-H10-31
+
 [Ryland Goldman](https://www.rylandgoldman.com/) • Los Gatos High School
 
 ---
 
-## Project Background
+## Abstract
 
-An *N*-body simulation is a simulated universe involving bodies either on a macro scale (i.e. planetary) or a micro scale (i.e. atomic). Bodies interact with each other with forces such as gravity. While most optimizations of *N*-body simulations involve particle-cluster interactions (such as the Barnes-Hut algorithm), this project is unique because it focuses on the more accurate direct particle-particle interactions. As such calculations take lots of CPU time, this project will be using parallelization with a graphics processing unit (GPU). In addition, accuracy can be improved on an atomic and astronomical scale by incorporating electromagnetic forces in addition to gravitational ones.
+*N*-body simulations are computer models of systems of bodies typically used for physics and astronomy applications such as predicting orbits of planets. These simulations typically require large amounts of processing power and time for physics computations. To solve this issue, developers use rounding and make compromises on accuracy in order to optimize the software. This project aims to use hardware acceleration rather than mathematical approximations to improve the performance of the simulation, written in Python.
 
-My goal is to create a more efficient and accurate method for an *N*-body simulation using CUDA with a GPU.
+The project compares a NumPy-based approach running on a 16-thread Intel 12600K CPU (compiled with Numba JIT) with CuPy interfacing with a NVIDIA 3090 GPU via the CUDA framework. The CPU group was the control, and CUDA was the experimental group. Two additional test groups used PyOpenCL to directly compare each device. One hundred trials were run on each of the four groups, and repeated using powers of two between 2^13 and 2^18 bodies.
 
-The control in this experiment is the processing time of an Intel CPU (12600K model), and the experimental group will be an Nvidia GPU (3090 model). The dependent variable is the amount of time it takes to complete each step in the simulation. The independent variables are the number of threads used (10,496 with GPU and 16 with CPU) and the number of particles simulated.
-
-This experiment is mostly limited in two ways: first, since computer components are expensive, I only have one. I will not be able to test multi-GPU or multi-CPU setups. I’m also limited in the amount of random access memory (RAM). The computer I will be using has 24 GB of Video RAM for the GPU and 32 GB which can be allocated between the CPU and GPU, minus the RAM used for system operation. Less RAM means a smaller number of particles can be used.
+Using 2^16 bodies, the speed up multiple for CuPy was 3.66x, OpenCL (GPU) was 1.05x, and OpenCL (CPU) was 0.56x. This suggests that CUDA is significantly faster than only using the CPU for computations, and the GPU OpenCL implementation was about twice as fast as the CPU OpenCL implementation.
 
 ### Flowchart
 
@@ -24,7 +24,58 @@ This experiment is mostly limited in two ways: first, since computer components 
 
 https://user-images.githubusercontent.com/48637662/206875568-a330c5bc-1c59-4f3f-a3a8-1acc370b57a1.mp4
 
+## Data
+
+![Number of Bodies vs  Compute Time](https://user-images.githubusercontent.com/48637662/218206792-de4ad9db-4970-475b-84ef-47f6a9af76bf.png)
+
+| Number of Bodies | Data File |
+| ---------------- | --------- |
+| 8192 | [DATA-8192.txt](https://rgold.dev/files/asr/DATA-8192.txt) |
+| 16384 | [DATA-16384.txt](https://rgold.dev/files/asr/DATA-16384.txt) |
+| 32768 | [DATA-32768.txt](https://rgold.dev/files/asr/DATA-32768.txt) |
+| 65536 | [DATA-65536.txt](https://rgold.dev/files/asr/DATA-65536.txt) |
+| 131072 | [DATA-131072.txt](https://rgold.dev/files/asr/DATA-131072.txt) |
+| 262144 | [DATA-262144.txt](https://rgold.dev/files/asr/DATA-262144.txt) |
+
+### Conclusion
+
+OpenCL seems consistently slower than native code (NumPy on CPU, CUDA on GPU). Interestingly, the OpenCL CPU was faster than the NumPy CPU when p ≥ 65,536. At this point, it was approximately the same as the OpenCL GPU, suggesting that the speed might have been limited by the latency of random access memory.
+
+The CUDA code has a trendline (ax^b) where b=0.978, meaning that the growth is less than linear. The most likely cause is the large relative inter-device data transfer times when the number of bodies is small, which have less of an effect when the compute time is greater. This also explains why NumPy is the fastest framework when p=8,192.
+
+OpenCL on the CPU was the most consistent test group. The R^2 of the trendline was 0.999. This is likely due to the fact that it is compiled in C++ instead of being interpreted with Python or sent to other devices.
+
+When the number of bodies was 16,384 ≤ p ≤ 65,536, some of the test groups were bimodal (as noted in the higher standard errors). The cause might be that some test groups had a higher frequency of collisions which took longer to calculate (since the initial positions and velocities were randomly chosen). The 8,192 group didn’t have many collisions since there were fewer particles, while the 131,072 and 262,144 groups had enough collisions that every trial encountered at least one.
+
+
 ## Daily Progress and Goals
+
+### 23 January 2023 to 6 February 2023
+
+**Goals**: 1) Collect data.
+
+Using a separate Python script, I’m looping through each of the four frameworks and testing one hundred trials of each, averaging the data, and sending it to my web server. The script will be run six times, once on each group (2^13, 2^14, 2^15, 2^16, 2^17, and 2^18 bodies). The parameters of the test script force one iteration, no rendering, and only a `float` timestamp output. Constants are set to `G=3,000`, `k=0`, `E=2^-128`, `t=0.01`, and `s=0.05`. Particle locations/positions are randomly generated, while mass/charge is set to one.
+
+### 17 January 2023 to 19 February 2023
+
+**Goals**: 1) Run preliminary performance benchmark
+
+Run the program with each starting condition (4,096, 8,192, 16,384, 32,768, 65,536, and 131,072 bodies) once on each device. The output is discarded (as I only need the program runtime). Constants are set to `G=3,000`, `k=0`, `E=2^-128`, `t=0.01`, and `s=0.05`. Particle locations/positions are randomly generated, while mass/charge is set to one.
+
+Blank cells took >600 seconds
+| Number of Particles | GPU | CPU Multithread | CPU Single Thread |
+| ------- | ------- | ------- | ------- |
+| 4096 | 1.47 | 0.57 | 48.66 |
+| 8192 | 2.98 | 1.79 | 199.36 |
+| 16384 | 11.83 | 5.86 | |
+| 32768 | 21.35 | 21.16 | |
+| 65536 | 50.17 | 114.79 | |
+| 131072 | 110.26 | | |
+
+![Processing Time vs  Number of Particles](https://user-images.githubusercontent.com/48637662/218206137-c4e6c3aa-7193-431c-b3f4-2185b781c3dc.png)
+
+
+This data has no statistical significance since only one trial was performed. However, the trendlines (ax^b) were around b=2 for most groups, as expected. The “CPU Multi” category ran as expected (exponential growth). The “GPU CUDA” category took longer than “CPU Multi” at the start, likely due to inter-device data transfer delays, eventually speeding up by 2^17 particles. The “CPU Single” took a lot longer than expected — instead of being 16x slower (as I have a 16-thread CPU), it was around 100x slower. I do not have time to use the CPU single thread in the final experiment.
 
 ### 13 January 2023
 
