@@ -24,6 +24,38 @@ Using 2^16 bodies, the speed up multiple for CuPy was 3.66x, OpenCL (GPU) was 1.
 
 https://user-images.githubusercontent.com/48637662/218208079-0eaac62a-7e47-48f6-a5a3-dbfc718e27f6.mov
 
+## Dependencies
+
+- Windows 11 Home Build 22621.900
+- Python 3.10.7 with pip CLI
+- Python random, time, os, sys, and math builtin libraries
+- Nvidia CUDA Toolkit 11.8
+- CuPy 11.3.0
+- NumPy 1.23.3
+- Fastrlock 0.8.1
+- Matplotlib 3.6.2
+- Contourpy 1.0.6
+- Cycler 0.11.0
+- Fonttools 4.38.0
+- Kiwisolver 1.4.4
+- Pillow 9.3.0
+- Dateutil 2.8.2
+- Six 1.16.0
+- Pyparsing 3.0.9
+- Packaging 20.0
+- FFmpeg 5.1.2
+- PyOpenCL 2022.3.1
+- Pytools 2022.1.14
+- Platformdirs 2.6.2
+- Typing-extensions 4.4.0
+- Plotly 5.12.0
+- Tenacity 8.1.0
+- Pandas 1.5.3
+- Pytz 2022.7.1
+- Numba 0.56.4
+- Setuptools 65.6.3
+- Llvmlite 0.39.1
+
 ## Data
 
 ![Number of Bodies vs  Compute Time](https://user-images.githubusercontent.com/48637662/218206792-de4ad9db-4970-475b-84ef-47f6a9af76bf.png)
@@ -46,7 +78,6 @@ The CUDA code has a trendline (ax^b) where b=0.978, meaning that the growth is l
 OpenCL on the CPU was the most consistent test group. The R^2 of the trendline was 0.999. This is likely due to the fact that it is compiled in C++ instead of being interpreted with Python or sent to other devices.
 
 When the number of bodies was 16,384 ≤ p ≤ 65,536, some of the test groups were bimodal (as noted in the higher standard errors). The cause might be that some test groups had a higher frequency of collisions which took longer to calculate (since the initial positions and velocities were randomly chosen). The 8,192 group didn’t have many collisions since there were fewer particles, while the 131,072 and 262,144 groups had enough collisions that every trial encountered at least one.
-
 
 ## Daily Progress and Goals
 
