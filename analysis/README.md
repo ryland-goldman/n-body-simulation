@@ -22,3 +22,5 @@ The data analysis section contains the code used to generate the line and bar gr
 - Plotly 4.10.1
 - Plyr 1.8.8
 - RSelenium 1.7.9
+- NPM 9.2.0
+- svgexport 0.4.2
