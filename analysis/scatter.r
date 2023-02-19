@@ -91,11 +91,7 @@ data <- rename(data, c("data_sem.Time" = "sem"))
 data$Bodies <- as.factor(data$Bodies)
 
 # Load figure
-fig <- plot_ly(data = data[which(data$Framework == 'NumPy'),], x = ~Bodies, y = ~Time, type = 'scatter', mode='lines+markers',  name='NumPy',
-               error_y = ~list(array = sem, color = '#000000'), yaxis = list(type = "log"))
-fig <- fig %>% add_trace(data = data[which(data$Framework == 'CuPy'),], name = 'CuPy')
-fig <- fig %>% add_trace(data = data[which(data$Framework == 'OpenCL CPU'),], name = 'OpenCL CPU')
-fig <- fig %>% add_trace(data = data[which(data$Framework == 'OpenCL GPU'),], name = 'OpenCL GPU')
+fig <- plot_ly(data = data[which(data$Framework == 'NumPy'),], x = ~Bodies, y = ~Time, type = 'scatter', mode='lines+markers',  name='NumPy', error_y = ~list(array = sem, color = '#000000'), yaxis = list(type = "log")) %>% add_trace(data = data[which(data$Framework == 'CuPy'),], name = 'CuPy') %>% add_trace(data = data[which(data$Framework == 'OpenCL CPU'),], name = 'OpenCL CPU') %>% add_trace(data = data[which(data$Framework == 'OpenCL GPU'),], name = 'OpenCL GPU')
 
 # Adjust layout
 fig <- layout(fig, yaxis = list(title = list(text="Time (seconds, log scale)",font=list(family = "Scala")), type = "log"), xaxis = list(title = list(text="Number of Bodies (log scale)", font=list(family = "Scala"))), title=list(text="Number of Bodies vs. Compute Time", font=list(family = "Scala")), legend=list(font=list(family = "Scala")), plot_bgcolor  = "rgba(0, 0, 0, 0)",paper_bgcolor = "rgba(0, 0, 0, 0)", margin = list(   l = 50,   r = 50,   b = 100,   t = 100,   pad = 4 ))
