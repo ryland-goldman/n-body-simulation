@@ -27,34 +27,33 @@ library(plyr)
 library(RSelenium)
 
 # Source data from CSV
-data1 <- read_csv("/Users/rylandgoldman/Downloads/data.csv")
-d1 <- data.frame(data1)
+csv_data <- data.frame(read_csv("/Users/rylandgoldman/Downloads/data.csv"))
 
 # Load data into data frames
-m8192np <- data.frame(Time=d1$X8192.NumPy, Framework="NumPy",Bodies=8192)
-m8192cp <- data.frame(Time=d1$X8192.CuPy, Framework="CuPy",Bodies=8192)
-m8192cc <- data.frame(Time=d1$X8192.OpenCL..CPU., Framework="OpenCL CPU",Bodies=8192)
-m8192cg <- data.frame(Time=d1$X8192.OpenCL..GPU., Framework="OpenCL GPU",Bodies=8192)
-m16384np <- data.frame(Time=d1$X16384.NumPy, Framework="NumPy",Bodies=16384)
-m16384cp <- data.frame(Time=d1$X16384.CuPy, Framework="CuPy",Bodies=16384)
-m16384cc <- data.frame(Time=d1$X16384.OpenCL..CPU., Framework="OpenCL CPU",Bodies=16384)
-m16384cg <- data.frame(Time=d1$X16384.OpenCL..GPU., Framework="OpenCL GPU",Bodies=16384)
-m32768np <- data.frame(Time=d1$X32768.NumPy, Framework="NumPy",Bodies=32768)
-m32768cp <- data.frame(Time=d1$X32768.CuPy, Framework="CuPy",Bodies=32768)
-m32768cc <- data.frame(Time=d1$X32768.OpenCL..CPU., Framework="OpenCL CPU",Bodies=32768)
-m32768cg <- data.frame(Time=d1$X32768.OpenCL..GPU., Framework="OpenCL GPU",Bodies=32768)
-m65536np <- data.frame(Time=d1$X65536.NumPy, Framework="NumPy",Bodies=65536)
-m65536cp <- data.frame(Time=d1$X65536.CuPy, Framework="CuPy",Bodies=65536)
-m65536cc <- data.frame(Time=d1$X65536.OpenCL..CPU., Framework="OpenCL CPU",Bodies=65536)
-m65536cg <- data.frame(Time=d1$X65536.OpenCL..GPU., Framework="OpenCL GPU",Bodies=65536)
-m131072np <- data.frame(Time=d1$X131072.NumPy, Framework="NumPy",Bodies=131072)
-m131072cp <- data.frame(Time=d1$X131072.CuPy, Framework="CuPy",Bodies=131072)
-m131072cc <- data.frame(Time=d1$X131072.OpenCL..CPU., Framework="OpenCL CPU",Bodies=131072)
-m131072cg <- data.frame(Time=d1$X131072.OpenCL..GPU., Framework="OpenCL GPU",Bodies=131072)
-m262144np <- data.frame(Time=d1$X262144.NumPy, Framework="NumPy",Bodies=262144)
-m262144cp <- data.frame(Time=d1$X262144.CuPy, Framework="CuPy",Bodies=262144)
-m262144cc <- data.frame(Time=d1$X262144.OpenCL..CPU., Framework="OpenCL CPU",Bodies=262144)
-m262144cg <- data.frame(Time=d1$X262144.OpenCL..GPU., Framework="OpenCL GPU",Bodies=262144)
+m8192np <- data.frame(Time=csv_data$X8192.NumPy, Framework="NumPy",Bodies=8192)
+m8192cp <- data.frame(Time=csv_data$X8192.CuPy, Framework="CuPy",Bodies=8192)
+m8192cc <- data.frame(Time=csv_data$X8192.OpenCL..CPU., Framework="OpenCL CPU",Bodies=8192)
+m8192cg <- data.frame(Time=csv_data$X8192.OpenCL..GPU., Framework="OpenCL GPU",Bodies=8192)
+m16384np <- data.frame(Time=csv_data$X16384.NumPy, Framework="NumPy",Bodies=16384)
+m16384cp <- data.frame(Time=csv_data$X16384.CuPy, Framework="CuPy",Bodies=16384)
+m16384cc <- data.frame(Time=csv_data$X16384.OpenCL..CPU., Framework="OpenCL CPU",Bodies=16384)
+m16384cg <- data.frame(Time=csv_data$X16384.OpenCL..GPU., Framework="OpenCL GPU",Bodies=16384)
+m32768np <- data.frame(Time=csv_data$X32768.NumPy, Framework="NumPy",Bodies=32768)
+m32768cp <- data.frame(Time=csv_data$X32768.CuPy, Framework="CuPy",Bodies=32768)
+m32768cc <- data.frame(Time=csv_data$X32768.OpenCL..CPU., Framework="OpenCL CPU",Bodies=32768)
+m32768cg <- data.frame(Time=csv_data$X32768.OpenCL..GPU., Framework="OpenCL GPU",Bodies=32768)
+m65536np <- data.frame(Time=csv_data$X65536.NumPy, Framework="NumPy",Bodies=65536)
+m65536cp <- data.frame(Time=csv_data$X65536.CuPy, Framework="CuPy",Bodies=65536)
+m65536cc <- data.frame(Time=csv_data$X65536.OpenCL..CPU., Framework="OpenCL CPU",Bodies=65536)
+m65536cg <- data.frame(Time=csv_data$X65536.OpenCL..GPU., Framework="OpenCL GPU",Bodies=65536)
+m131072np <- data.frame(Time=csv_data$X131072.NumPy, Framework="NumPy",Bodies=131072)
+m131072cp <- data.frame(Time=csv_data$X131072.CuPy, Framework="CuPy",Bodies=131072)
+m131072cc <- data.frame(Time=csv_data$X131072.OpenCL..CPU., Framework="OpenCL CPU",Bodies=131072)
+m131072cg <- data.frame(Time=csv_data$X131072.OpenCL..GPU., Framework="OpenCL GPU",Bodies=131072)
+m262144np <- data.frame(Time=csv_data$X262144.NumPy, Framework="NumPy",Bodies=262144)
+m262144cp <- data.frame(Time=csv_data$X262144.CuPy, Framework="CuPy",Bodies=262144)
+m262144cc <- data.frame(Time=csv_data$X262144.OpenCL..CPU., Framework="OpenCL CPU",Bodies=262144)
+m262144cg <- data.frame(Time=csv_data$X262144.OpenCL..GPU., Framework="OpenCL GPU",Bodies=262144)
 
 # Function for error propagation calculations
 # https://courses.washington.edu/phys431/propagation_errors_UCh.pdf
@@ -105,5 +104,4 @@ fig
 
 # Export figure
 export(fig, file = " plot.svg", selenium = RSelenium::rsDriver(browser = "firefox"))
-# After file is exported, run `svgexport plot.svg out.png 8x`
-# Requires `npm install svgexport`
+# After file is exported, run `svgexport plot.svg out.png 8x` to generate png
