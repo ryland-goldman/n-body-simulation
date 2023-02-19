@@ -58,7 +58,9 @@ https://user-images.githubusercontent.com/48637662/218208079-0eaac62a-7e47-48f6-
 
 ## Data
 
-![Number of Bodies vs  Compute Time](https://user-images.githubusercontent.com/48637662/218206792-de4ad9db-4970-475b-84ef-47f6a9af76bf.png)
+![Scatter](https://user-images.githubusercontent.com/48637662/219972651-b9b71811-944d-45ee-a607-eefff1c98a7d.png)
+![Bar](https://user-images.githubusercontent.com/48637662/219972653-302bc70a-4dc3-48c2-967f-f5c17ef2dd3a.png)
+
 
 | Number of Bodies | Data File |
 | ---------------- | --------- |
