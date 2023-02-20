@@ -76,7 +76,7 @@ else: raise RuntimeError("Please specify a valid framework.")             # if n
 ######## CONSTANTS ########
 G = 3000.0                 # gravitational constant
 k = 0.0                    # coloumb's constant
-E = pow(2,-128)            # softening constant
+E = pow(2,1)               # softening constant
 t = 1e-2                   # time constant
 p = int(4096)              # particles
 s = 0.05                   # particle size
@@ -167,7 +167,7 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     r = np.sqrt( r )
 
     # calculate force
-    f = t * (G*p1m*p2m - k*p1q*p2q)/( (E + r**2 ) * p1m) # use newton's law of universal gravitation, and coulomb's law (subtraction because opposites attract, like charges repel), divide by mass because of newton's 2nd law
+    f = t * r * (G*p1m*p2m - k*p1q*p2q)/( (E + r**2 ) ** 1.5 * p1m) # use newton's law of universal gravitation, and coulomb's law (subtraction because opposites attract, like charges repel), divide by mass because of newton's 2nd law
 
     # calculate angles - see https://bit.ly/3Hq4s7v
     alpha = np.where(dx < 0, -np.arcsin(dy/(r+E)), np.arcsin(dy/(r+E))) # the angle is negative if the x value moves in the negative direction
