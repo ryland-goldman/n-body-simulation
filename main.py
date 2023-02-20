@@ -49,14 +49,21 @@
 #    1            - Only simulation runtime logged to console
 #    2            - Show full end output
 #    3            - Show full end output and progress
+# INIT_CONDITIONS options:
+#    rand         - Full random
+#    sphere       - Normal distribution sphere
+#    two          - Two spheres
+#    two-small    - One smaller sphere, one larger sphere
+#    two-disk     - Two disks
 import sys
+INIT_CONDITIONS = "two"
 if not sys.stdin.isatty():
     FRAMEWORK = sys.argv[1]
     DISPLAY = sys.argv[2]
     OUTPUT = 1
 else:
-    FRAMEWORK = "CuPy"
-    DISPLAY = "None"
+    FRAMEWORK = "NumPy-M"
+    DISPLAY = "Plot"
     OUTPUT = 3
 
 ######## LIBRARIES ########
@@ -74,27 +81,63 @@ elif FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == 
 else: raise RuntimeError("Please specify a valid framework.")             # if no framework is specified, raise an error
 
 ######## CONSTANTS ########
-G = 3000.0                 # gravitational constant
-k = 0.0                    # coloumb's constant
-E = pow(2,1)               # softening constant
-t = 1e-2                   # time constant
-p = int(4096)              # particles
-s = 0.05                   # particle size
+G = 50000.0                 # gravitational constant
+k = 0.0                     # coloumb's constant
+E = 100000                  # softening constant
+t = 1.0                     # time constant
+p = int(1024)               # particles
+s = 0.05                    # particle size
 if not sys.stdin.isatty(): p = int(sys.argv[4])
 
 ######## DATA STORAGE ########
-iterations = int(5)          # iterations of simulation
+iterations = int(500)          # iterations of simulation
 frequency  = int(1)          # frequency of recording frames
 px = np.random.rand(p)*7e2   # x, y, z coordinates
 py = np.random.rand(p)*7e2   # x, y, z coordinates
 pz = np.random.rand(p)*7e2   # x, y, z coordinates
-pvx = np.random.rand(p)*t*1e2# component velocities: x, y, z
-pvy = np.random.rand(p)*t*1e2# component velocities: x, y, z
-pvz = np.random.rand(p)*t*1e2# component velocities: x, y, z
+pvx = np.random.rand(p)*t*0# component velocities: x, y, z
+pvy = np.random.rand(p)*t*0# component velocities: x, y, z
+pvz = np.random.rand(p)*t*0# component velocities: x, y, z
 pq = np.ones(p)              # charge
 pm = np.ones(p)              # mass
 end_process = []             # list to store data which will be processed at the end
 if not sys.stdin.isatty(): iterations = int(sys.argv[3])
+
+######## INITIAL CONDITIONS SETUP ########
+if INIT_CONDITIONS == "two-small":
+    n1 = p*3 // 4
+    n2 = p - n1
+    pxa = np.random.normal(10, 1, n1)*7e2
+    pxb = np.random.normal(-10, 1, n2)*7e2
+    px = np.concatenate((pxa, pxb))
+    py = np.random.normal(0, 1, p)*7e2
+    pz = np.random.normal(0, 1, p)*7e2
+elif INIT_CONDITIONS == "two":
+    n1 = p // 2
+    n2 = p - n1
+    pxa = np.random.normal(10, 1, n1)*7e2
+    pxb = np.random.normal(-10, 1, n2)*7e2
+    px = np.concatenate((pxa, pxb))
+    py = np.random.normal(0, 1, p)*7e2
+    pz = np.random.normal(0, 1, p)*7e2
+elif INIT_CONDITIONS == "two-disk":
+    n1 = p // 2
+    n2 = p - n1
+    pxa = np.random.normal(10, 1, n1)*7e2
+    pxb = np.random.normal(-10, 1, n2)*7e2
+    px = np.concatenate((pxa, pxb))
+    py = np.random.normal(0, 1, p)*5
+    pz = np.random.normal(0, 1, p)*7e2
+elif INIT_CONDITIONS == "sphere":
+    px = np.random.normal(10, 1, p)*7e2
+    py = np.random.normal(0, 1, p)*7e2
+    pz = np.random.normal(0, 1, p)*7e2
+elif INIT_CONDITIONS == "rand":
+    px = px
+    py = py
+    pz = pz
+else:
+    raise RuntimeError("Please specify initial conditions.")
 
 ######## OPENCL SETUP ########
 if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "PyOpenCL":
@@ -124,28 +167,146 @@ if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "P
 
     queue = cl.CommandQueue(ctx) # OpenCL command queue
     mf = cl.mem_flags            # Memory flags
-    constants = r"""double G = """+f'{G:.20f}'+r""";
+    prg = cl.Program(ctx, r"""
+// Enable OpenCL extension for double-precision FP64
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+
+__kernel void force(
+        __global const int *cp_ptr,   // Pointer for the integer index of the current particle in the array
+        __global const double *p2x,   // X-coordinate array of all particles
+        __global const double *p2y,   // Y-coordinate array of all particles
+        __global const double *p2z,   // Z-coordinate array of all particles
+        __global const double *p2m,   // Mass of all particles
+        __global const double *p2q,   // Charge of all particles
+        __global double *p1vx,        // Modifiable array of partial component velocities in the x direction
+        __global double *p1vy,        // Modifiable array of partial component velocities in the y direction
+        __global double *p1vz,        // Modifiable array of partial component velocities in the z direction
+        __global const double *p2vx,  // X component direction of all particle velocities
+        __global const double *p2vy,  // Y component direction of all particle velocities
+        __global const double *p2vz,  // Z component direction of all particle velocities
+        __global double *v1x,         // Contains new velocitiy in the x direction if a collision occured, otherwise zero
+        __global double *v1y,         // Contains new velocitiy in the x direction if a collision occured, otherwise zero
+        __global double *v1z          // Contains new velocitiy in the x direction if a collision occured, otherwise zero
+    ){
+        // Fetch current particle information using data from cp_ptr
+        int cp = cp_ptr[0];
+        double p1x = p2x[cp];
+        double p1y = p2y[cp];
+        double p1z = p2z[cp];
+        double p1vxi = p2vx[cp];
+        double p1vyi = p2vy[cp];
+        double p1vzi = p2vz[cp];
+        double p1m = p2m[cp];
+        double p1q = p2q[cp];
+
+        // Get ID of current thread
+        int tid = get_global_id(0);
+
+        // Import constants from Python
+        double G = """+f'{G:.20f}'+r""";
         double k = """+f'{k:.20f}'+r""";
         double E = """+f'{E:.400f}'+r""";
         double t = """+f'{t:.200f}'+r""";
-        double s = """+f'{s:.10f}'+r""";""";
-    kernel_import = open("C:\\Nbody\\kernel.cl","r").read().replace("//ImportConstants",constants)
-    prg = cl.Program(ctx, kernel_import).build()
+        double s = """+f'{s:.10f}'+r""";
+
+        // Calculate differences in position
+        double dx = p1x - p2x[tid];
+        double dy = p1y - p2y[tid];
+        double dz = p1z - p2z[tid];
+
+        // Calculate total distance with distance formula
+        double r = sqrt( dx*dx + dy*dy + dz*dz );
+
+        // Check if particles are different. If so, continue. If not, skip the particle.
+        if( r != 0.0 ){
+            double f_g = G * p1m * p2m[tid];  // Force from gravity
+            double f_e = k * p1q * p2q[tid];  // Force from electromagnetsim
+            double f = t * (f_g - f_e)/((r * r + E) * p1m);  // Net acceleration 
+            double alpha = asin(dy/(r+E));    // Calculate angle alpha
+            double beta = atan(dx/(dz+E));    // Calculate angle beta
+
+            if(dx<0){ alpha = -alpha; }       // If dx is negative, alpha flips
+
+            // Calculate acceleration components
+            p1vx[tid] = f * cos(alpha) * sin(beta);
+            p1vy[tid] = f * sin(alpha);
+            p1vz[tid] = f * cos(alpha) * cos(beta);
+
+            // If a collision occured, set the new velocities assuming perfectly elastic collisions
+            if(r < s){
+                v1x[tid] = ((p1m - p2m[tid]) * p1vxi + 2 * p2m[tid] * p2vx[tid]) / (p1m + p2m[tid]);
+                v1y[tid] = ((p1m - p2m[tid]) * p1vyi + 2 * p2m[tid] * p2vy[tid]) / (p1m + p2m[tid]);
+                v1z[tid] = ((p1m - p2m[tid]) * p1vzi + 2 * p2m[tid] * p2vz[tid]) / (p1m + p2m[tid]);
+            } else {
+                v1x[tid] = 0.0;
+                v1y[tid] = 0.0;
+                v1z[tid] = 0.0;
+            }
+        } else {
+            p1vx[tid] = 0.0;
+            p1vy[tid] = 0.0;
+            p1vz[tid] = 0.0;
+        }
+    }""").build()
 
 
 ######## CUDA SETUP ########
 if FRAMEWORK == "CuPy":
-    num_blocks = 4
+    num_blocks = 16
     num_threads = 1024
 
-    constants = r"""double G = """+f'{G:.20f}'+r""";
-        double k = """+f'{k:.20f}'+r""";
-        double E = """+f'{E:.400f}'+r""";
-        double t = """+f'{t:.200f}'+r""";
-        double s = """+f'{s:.10f}'+r""";""";
-    kernel_import = open("C:\\Nbody\\kernel.cu","r").read().replace("//ImportConstants",constants)
-    
-    force_kernel = np.RawKernel(kernel_import, 'force_kernel')
+    #if p > (num_blocks * num_threads):
+    #    raise RuntimeError("Invalid number of blocks and threads.")
+
+    force_kernel = np.RawKernel(
+        r'''#include <cuda_runtime.h>
+        extern "C" __global__
+
+        /*
+         * For comments, please see the OpenCL implementation above.
+         */
+        void force_kernel(
+            double p1x, double p1y, double p1z, double p1vxi, double p1vyi, double p1vzi, double p1m, double p1q, double* p2x, double* p2y, double* p2z, double* p2m, double* p2q, double* p1vx, double* p1vy, double* p1vz, double* p2vx, double* p2vy, double* p2vz, double* v1x, double* v1y, double* v1z
+        ) {
+            int tid = blockDim.x * blockIdx.x + threadIdx.x;
+            
+            double G = '''+f'{G:.20f}'+''';
+            double k = '''+f'{k:.20f}'+''';
+            double E = '''+f'{E:.400f}'+''';
+            double t = '''+f'{t:.200f}'+'''; 
+            double s = '''+f'{s:.10f}'+''';
+
+            double dx = p1x - p2x[tid];
+            double dy = p1y - p2y[tid];
+            double dz = p1z - p2z[tid];
+            
+            double r = sqrt( dx*dx + dy*dy + dz*dz );
+            if( r != 0.0 ){
+                double f = t * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/((r * r+E)*p1m);
+                double alpha = asin(dy/(r+E));
+                double beta = atan(dx/(dz+E));
+
+                if(dx<0){ alpha = -alpha; }
+
+                p1vx[tid] = f * cos(alpha) * sin(beta);
+                p1vy[tid] = f * sin(alpha);
+                p1vz[tid] = f * cos(alpha) * cos(beta);
+                
+                if(r < s){
+                    v1x[tid] = ((p1m - p2m[tid]) * p1vxi + 2 * p2m[tid] * p2vx[tid]) / (p1m + p2m[tid]);
+                    v1y[tid] = ((p1m - p2m[tid]) * p1vyi + 2 * p2m[tid] * p2vy[tid]) / (p1m + p2m[tid]);
+                    v1z[tid] = ((p1m - p2m[tid]) * p1vzi + 2 * p2m[tid] * p2vz[tid]) / (p1m + p2m[tid]);
+                } else {
+                    v1x[tid] = 0.0;
+                    v1y[tid] = 0.0;
+                    v1z[tid] = 0.0;
+                }
+            } else {
+                p1vx[tid] = 0.0;
+                p1vy[tid] = 0.0;
+                p1vz[tid] = 0.0;
+            }
+        }''', 'force_kernel')
 
 ######## NUMPY SETUP ########
 # function to calculate the acceleration of one particle on another given the distance, mass, and charge
@@ -167,16 +328,12 @@ def getForceNV(p1x, p1y, p1z, p1vx, p1vy, p1vz, p1m, p1q, p2x, p2y, p2z, p2m, p2
     r = np.sqrt( r )
 
     # calculate force
-    f = t * r * (G*p1m*p2m - k*p1q*p2q)/( (E + r**2 ) ** 1.5 * p1m) # use newton's law of universal gravitation, and coulomb's law (subtraction because opposites attract, like charges repel), divide by mass because of newton's 2nd law
-
-    # calculate angles - see https://bit.ly/3Hq4s7v
-    alpha = np.where(dx < 0, -np.arcsin(dy/(r+E)), np.arcsin(dy/(r+E))) # the angle is negative if the x value moves in the negative direction
-    beta = np.arctan(dx/(dz+E))
+    f = t * r * (G*p1m*p2m - k*p1q*p2q)/( (E + r**2 )**1.5 * p1m) # use newton's law of universal gravitation, and coulomb's law (subtraction because opposites attract, like charges repel), divide by mass because of newton's 2nd law
 
     # calculate component vectors of forces - see https://bit.ly/3Hq4s7v
-    xforce = np.where(r==0, 0, f*np.cos(alpha)*np.sin(beta))
-    yforce = np.where(r==0, 0, f*np.sin(alpha))
-    zforce = np.where(r==0, 0, f*np.cos(alpha)*np.cos(beta))
+    xforce = np.where(r==0, 0, -f*dx/r)
+    yforce = np.where(r==0, 0, -f*dy/r)
+    zforce = np.where(r==0, 0, -f*dz/r)
 
     # check if collision occurs
     v1x = np.where( (r < s) & (r != 0), (((p1m - p2m) * p1vx + 2 * p2m * p2vx) / (p1m + p2m)), 0)
@@ -326,7 +483,7 @@ def create_video(frames):
             ax = fig.add_subplot(projection='3d')    # new 3D plot
             ax.clear()         # clear plot
             ax.scatter3D(frame[1],frame[2],frame[3]) # add x, y, and z axes
-            plt.savefig('C:\\Nbody\\files\\frame-'+str(counter)+'.png') # save image in C:\Nbody
+            plt.savefig('/Users/rylandgoldman/Desktop/ASR/frame-'+str(counter)+'.png', transparent=True) # save image in C:\Nbody
             ax.clear()         # clear plot
             plt.close(fig)     # close plot
             counter = counter + 1 # increment counter
@@ -343,8 +500,8 @@ def create_video(frames):
 
         # remove all files in directory
         filelist = [ f for f in os.listdir("C:\\Nbody\\files\\") if f.endswith(".png") ]
-        for f in filelist:
-            os.remove(os.path.join("C:\\Nbody\\files\\", f))
+        #for f in filelist:
+            #os.remove(os.path.join("C:\\Nbody\\files\\", f))
     if DISPLAY == 'Plot' or DISPLAY == 'Both':
         # array for coordinates, particles, and frames
         data_x = []
