@@ -18,14 +18,10 @@
             double r = sqrt( dx*dx + dy*dy + dz*dz );
             if( r != 0.0 ){
                 double f = t * r * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/(math.sqrt((r * r + E)*(r * r + E)*(r * r + E))*p1m);
-                double alpha = asin(dy/(r+E));
-                double beta = atan(dx/(dz+E));
 
-                if(dx<0){ alpha = -alpha; }
-
-                p1vx[tid] = f * cos(alpha) * sin(beta);
-                p1vy[tid] = f * sin(alpha);
-                p1vz[tid] = f * cos(alpha) * cos(beta);
+                p1vx[tid] = -1.0 * f * dx / r;
+                p1vy[tid] = -1.0 * f * dy / r;
+                p1vz[tid] = -1.0 * f * dz / r;
                 
                 if(r < s){
                     v1x[tid] = ((p1m - p2m[tid]) * p1vxi + 2 * p2m[tid] * p2vx[tid]) / (p1m + p2m[tid]);
