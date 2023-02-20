@@ -2,7 +2,7 @@
         extern "C" __global__
 
         /*
-         * For comments, please see the OpenCL implementation above.
+         * For comments, please see the OpenCL implementation.
          */
         void force_kernel(
             double p1x, double p1y, double p1z, double p1vxi, double p1vyi, double p1vzi, double p1m, double p1q, double* p2x, double* p2y, double* p2z, double* p2m, double* p2q, double* p1vx, double* p1vy, double* p1vz, double* p2vx, double* p2vy, double* p2vz, double* v1x, double* v1y, double* v1z
@@ -17,7 +17,7 @@
             
             double r = sqrt( dx*dx + dy*dy + dz*dz );
             if( r != 0.0 ){
-                double f = t * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/((r * r+E)*p1m);
+                double f = t * r * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/(math.sqrt((r * r + E)*(r * r + E)*(r * r + E))*p1m);
                 double alpha = asin(dy/(r+E));
                 double beta = atan(dx/(dz+E));
 
