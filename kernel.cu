@@ -17,7 +17,7 @@
             
             double r = sqrt( dx*dx + dy*dy + dz*dz );
             if( r != 0.0 ){
-                double f = t * r * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/(math.sqrt((r * r + E)*(r * r + E)*(r * r + E))*p1m);
+                double f = t * r * (G * p1m * p2m[tid] - k * p1q * p2q[tid])/(sqrt((r * r + E)*(r * r + E)*(r * r + E))*p1m);
 
                 p1vx[tid] = -1.0 * f * dx / r;
                 p1vy[tid] = -1.0 * f * dy / r;
