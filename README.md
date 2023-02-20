@@ -22,7 +22,8 @@ Using 2^16 bodies, the speed up multiple for CuPy was 3.66x, OpenCL (GPU) was 1.
 
 ### Example Output
 
-https://user-images.githubusercontent.com/48637662/218208079-0eaac62a-7e47-48f6-a5a3-dbfc718e27f6.mov
+
+https://user-images.githubusercontent.com/48637662/220209496-f74ec78c-b83f-47ae-a8e0-42f28dfb02f6.mp4
 
 ## Dependencies
 
