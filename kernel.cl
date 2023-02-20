@@ -48,7 +48,7 @@ __kernel void force(
         if( r != 0.0 ){
             double f_g = G * p1m * p2m[tid];  // Force from gravity
             double f_e = k * p1q * p2q[tid];  // Force from electromagnetsim
-            double f = t * r * (f_g - f_e)/( math.sqrt((r * r + E)*(r * r + E)*(r * r + E)) * p1m);  // Net acceleration 
+            double f = t * r * (f_g - f_e)/( sqrt((r * r + E)*(r * r + E)*(r * r + E)) * p1m);  // Net acceleration 
 
             // Calculate acceleration components
             p1vx[tid] = -1.0 * f * dx / r;
