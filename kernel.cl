@@ -49,15 +49,11 @@ __kernel void force(
             double f_g = G * p1m * p2m[tid];  // Force from gravity
             double f_e = k * p1q * p2q[tid];  // Force from electromagnetsim
             double f = t * r * (f_g - f_e)/( math.sqrt((r * r + E)*(r * r + E)*(r * r + E)) * p1m);  // Net acceleration 
-            double alpha = asin(dy/(r+E));    // Calculate angle alpha
-            double beta = atan(dx/(dz+E));    // Calculate angle beta
-
-            if(dx<0){ alpha = -alpha; }       // If dx is negative, alpha flips
 
             // Calculate acceleration components
-            p1vx[tid] = f * cos(alpha) * sin(beta);
-            p1vy[tid] = f * sin(alpha);
-            p1vz[tid] = f * cos(alpha) * cos(beta);
+            p1vx[tid] = -1.0 * f * dx / r;
+            p1vy[tid] = -1.0 * f * dy / r;
+            p1vz[tid] = -1.0 * f * dz / r;
 
             // If a collision occured, set the new velocities assuming perfectly elastic collisions
             if(r < s){
