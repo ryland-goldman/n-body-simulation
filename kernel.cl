@@ -48,7 +48,7 @@ __kernel void force(
         if( r != 0.0 ){
             double f_g = G * p1m * p2m[tid];  // Force from gravity
             double f_e = k * p1q * p2q[tid];  // Force from electromagnetsim
-            double f = t * (f_g - f_e)/((r * r + E) * p1m);  // Net acceleration 
+            double f = t * r * (f_g - f_e)/( math.sqrt((r * r + E)*(r * r + E)*(r * r + E)) * p1m);  // Net acceleration 
             double alpha = asin(dy/(r+E));    // Calculate angle alpha
             double beta = atan(dx/(dz+E));    // Calculate angle beta
 
