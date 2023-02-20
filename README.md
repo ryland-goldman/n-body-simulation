@@ -16,17 +16,15 @@ The project compares a NumPy-based approach running on a 16-thread Intel 12600K 
 
 Using 2^16 bodies, the speed up multiple for CuPy was 3.66x, OpenCL (GPU) was 1.05x, and OpenCL (CPU) was 0.56x. This suggests that CUDA is significantly faster than only using the CPU for computations, and the GPU OpenCL implementation was about twice as fast as the CPU OpenCL implementation.
 
-### Flowchart
+### Poster
 
-![Flowchart](https://www.rylandgoldman.com/files/asr/Flowchart.png)
+![Poster](https://user-images.githubusercontent.com/48637662/220213090-9c841b29-91af-498a-a210-f1b7eecc2d64.svg)
+
 
 ### Example Output
 
 https://user-images.githubusercontent.com/48637662/220209496-f74ec78c-b83f-47ae-a8e0-42f28dfb02f6.mp4
 
-### Poster
-
-![Poster](https://user-images.githubusercontent.com/48637662/220213090-9c841b29-91af-498a-a210-f1b7eecc2d64.svg)
 
 ## Dependencies
 
@@ -74,6 +72,9 @@ https://user-images.githubusercontent.com/48637662/220209496-f74ec78c-b83f-47ae-
 | 65536 | [DATA-65536.txt](https://rgold.dev/files/asr/DATA-65536.txt) |
 | 131072 | [DATA-131072.txt](https://rgold.dev/files/asr/DATA-131072.txt) |
 | 262144 | [DATA-262144.txt](https://rgold.dev/files/asr/DATA-262144.txt) |
+
+Also see [data.csv](https://github.com/ryland-goldman/n-body-simulation/blob/main/analysis/data.csv)
+
 
 ### Conclusion
 
