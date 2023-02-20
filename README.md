@@ -83,6 +83,12 @@ When the number of bodies was 16,384 ≤ p ≤ 65,536, some of the test groups w
 
 ## Daily Progress and Goals
 
+### 8 February 2023 to 20 February 2023
+
+**Goals**: 1) Analyse data, 2) clean up code
+
+For the code used for the data analysis, please see [Analysis](https://github.com/ryland-goldman/n-body-simulation/tree/main/analysis). I also cleaned up the code for better presentation, moving the kernels to seperate files, and added a small fix to force softening.
+
 ### 23 January 2023 to 6 February 2023
 
 **Goals**: 1) Collect data.
