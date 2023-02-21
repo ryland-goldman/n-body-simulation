@@ -92,7 +92,10 @@ When the number of bodies was 16,384 ≤ p ≤ 65,536, some of the test groups w
 
 **Goals**: 1) Get video for project display
 
-As I was trying to get a video for the Synopsys presentation, I realised that I incorrectly did the calculations for calculating the component vectors of the force. I simplified it and updated the code. This should have little effect on the data.
+As I was trying to get a video for the Synopsys presentation, I realised that I incorrectly did the calculations for calculating the component vectors of the force. I simplified it and updated the code. This should have little effect on the data. I used two models for the video with the following conditions:
+
+- Colliding galaxies: `G=50000` `k=0` `E=100000` `p=1024` `t=1` `i/f=500:1`
+- Orbiting bodies: `G=800` `k=0` `E=100000` `p=4` `t=1` `i/f=30000:100`
 
 ### 8 February 2023 to 20 February 2023
 
