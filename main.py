@@ -57,6 +57,7 @@
 #    two-disk     - Two disks
 import sys
 INIT_CONDITIONS = "two"
+FILE_PATH = "C:\\Nbody\\"
 if not sys.stdin.isatty():
     FRAMEWORK = sys.argv[1]
     DISPLAY = sys.argv[2]
@@ -172,7 +173,7 @@ if FRAMEWORK == "PyOpenCL-CPU" or FRAMEWORK == "PyOpenCL-GPU" or FRAMEWORK == "P
         double E = """+f'{E:.400f}'+r""";
         double t = """+f'{t:.200f}'+r""";
         double s = """+f'{s:.10f}'+r""";""";
-    kernel_import = open("C:\\Nbody\\kernel.cl","r").read().replace("//ImportConstants",constants)
+    kernel_import = open(FILE_PATH+"kernel.cl","r").read().replace("//ImportConstants",constants)
     prg = cl.Program(ctx, kernel_import).build()
 
 
@@ -186,7 +187,7 @@ if FRAMEWORK == "CuPy":
         double E = """+f'{E:.400f}'+r""";
         double t = """+f'{t:.200f}'+r""";
         double s = """+f'{s:.10f}'+r""";""";
-    kernel_import = open("C:\\Nbody\\kernel.cu","r").read().replace("//ImportConstants",constants)
+    kernel_import = open(FILE_PATH+"kernel.cu","r").read().replace("//ImportConstants",constants)
     
     force_kernel = np.RawKernel(kernel_import, 'force_kernel')
 
@@ -365,25 +366,26 @@ def create_video(frames):
             ax = fig.add_subplot(projection='3d')    # new 3D plot
             ax.clear()         # clear plot
             ax.scatter3D(frame[1],frame[2],frame[3]) # add x, y, and z axes
-            plt.savefig('C:\\Nbody\\files\\frame-'+str(counter)+'.png') # save image in C:\Nbody
+            plt.savefig(FILE_PATH+'frame-'+str(counter)+'.png') # save image in C:\Nbody
             ax.clear()         # clear plot
             plt.close(fig)     # close plot
             counter = counter + 1 # increment counter
 
         # use FFmpeg to generate a video, switching the frame rate based on the number of frames
+        FFMPEG_LOCATION = "C:\\Nbody\\ffmpeg.exe"
         if iterations/frequency > 2500:
-            os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 60 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+            os.system(FFMPEG_LOCATION+" -f image2 -r 60 -i "+FILE_PATH+"frame-%01d.png -vcodec mpeg4 -b:v 20M -y "+FILE_PATH+"video.mp4")
         if iterations/frequency > 500:
-            os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 30 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+            os.system(FFMPEG_LOCATION+" -f image2 -r 30 -i "+FILE_PATH+"frame-%01d.png -vcodec mpeg4 -b:v 20M -y "+FILE_PATH+"video.mp4")
         if iterations/frequency > 100:
-            os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 20 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+            os.system(FFMPEG_LOCATION+" -f image2 -r 20 -i "+FILE_PATH+"frame-%01d.png -vcodec mpeg4 -b:v 20M -y "+FILE_PATH+"video.mp4")
         else:
-            os.system("C:\\Nbody\\ffmpeg.exe -f image2 -r 10 -i C:\\Nbody\\files\\frame-%01d.png -vcodec mpeg4 -y C:\\Nbody\\video.mp4")
+            os.system(FFMPEG_LOCATION+" -f image2 -r 10 -i "+FILE_PATH+"frame-%01d.png -vcodec mpeg4 -b:v 20M -y "+FILE_PATH+"video.mp4")
 
         # remove all files in directory
-        filelist = [ f for f in os.listdir("C:\\Nbody\\files\\") if f.endswith(".png") ]
+        filelist = [ f for f in os.listdir(FILE_PATH) if f.endswith(".png") ]
         for f in filelist:
-            os.remove(os.path.join("C:\\Nbody\\files\\", f))
+            os.remove(os.path.join(FILE_PATH, f))
     if DISPLAY == 'Plot' or DISPLAY == 'Both':
         # array for coordinates, particles, and frames
         data_x = []
@@ -408,6 +410,7 @@ def create_video(frames):
         fig.show()
 
 ###### COMPILE #####
+# compile by running the program once
 if OUTPUT >= 2:
     print("Compiling...")
 precompile_time = time.time() # time before compilation
