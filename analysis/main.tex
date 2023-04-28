@@ -1,0 +1,238 @@
+\documentclass[12pt, letterpaper]{article}
+
+\usepackage[style=apa]{biblatex}
+\usepackage{float}
+\usepackage{indentfirst}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage[symbol]{footmisc}
+
+\addbibresource{citations.bib}
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+
+\title{Using CUDA to Increase the Accuracy and Performance of 
+Particle-Particle \textit{N}-Body Simulations}
+\author{Ryland Goldman}
+\date{28 April 2023}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\textit{N}-body simulations are computer models of systems of bodies 
+typically used for physics and astronomy applications, such as predicting 
+orbits of planets. These simulations typically require large amounts of 
+processing power and time for physics computations. To solve this issue, 
+developers use rounding and make compromises on accuracy in order to 
+optimize the software. This project aims to use hardware acceleration 
+rather than mathematical approximations to improve the performance of the 
+simulation, written in Python.
+
+The project compares a NumPy-based approach running on a 16-thread Intel 
+12600K CPU (compiled with Numba JIT) with CuPy interfacing with a NVIDIA 
+3090 GPU via the CUDA framework. The CPU group was the control, and CUDA 
+was the experimental group. Two additional test groups used PyOpenCL to 
+directly compare each device. One hundred trials were run on each of the 
+four groups, and repeated using powers of two between 
+\begin{math}2^{13}\end{math} and \begin{math}2^{18}\end{math} bodies.
+
+Using \begin{math}2^{16}\end{math} bodies, the speed up multiple for CuPy 
+was 3.66x, OpenCL (GPU) was 1.05x, and OpenCL (CPU) was 0.56x. This 
+suggests that CUDA is significantly faster than only using the CPU for 
+computations, and the GPU OpenCL implementation was about twice as fast as 
+the CPU OpenCL implementation.
+
+\end{abstract}
+\clearpage
+
+\section{Introduction}
+\vspace{1pt}\hrule\vspace{12pt}
+
+\begin{figure}[H]
+\includegraphics[width=9cm]{frame-0.png}
+\centering
+\label{fig:exampleout}
+\caption{Example Output}
+\end{figure}
+
+\textit{N}-body simulations are physics simulations used to study the 
+motion of a number of particles or bodies, such as stars, galaxies, or 
+planets (as shown in Figure 1). They calculate the trajectories of the 
+individual bodies by taking into account the gravitational forces between 
+them, and are commonly used for understanding the nature of the universe — 
+for example, in Newtonian orbital predictions and studying the formation 
+of galaxies (\cite{antonana_majorant_2022}). The time complexity of 
+computing such forces increases on the order of 
+\begin{math}O(n^2)\end{math}, meaning that doubling the number of bodies 
+takes four times as long to run (\cite{trenti_n-body_2008}). Historically, 
+mathematical approximations, such as the Barnes-Hut tree algorithm 
+(\cite{anderson_tree_1999}), have been used to reduce the complexity to 
+\begin{math}O(n\log n)\end{math}. However, these approximations can 
+introduce errors and can be less accurate than direct, "particle-particle" 
+simulations. 
+
+To prevent the errors caused by rounding, this project focuses on hardware 
+acceleration on a Graphics Processing Unit (GPU) while keeping the most 
+accurate, though relatively slow, "particle-particle" algorithm.  GPUs are 
+designed for parallel programming, and are commonly used for 
+general-purpose GPU computing (GPGPU) in addition to their primary target 
+of rendering video. Rather than stepping through calculations one at a 
+time, a GPU can run thousands of operations concurrently. This is done 
+with a compute kernel, a single function which sends instructions to every 
+core in the GPU at once (\cite{rasch_docal:_2020}).
+
+The kernels are written with two of the most popular frameworks, CUDA and 
+OpenCL. CUDA is an interface first developed by Nvidia in 2007 
+specifically to run on its GPUs (\cite{rasch_docal:_2020}). OpenCL is a 
+similar framework created by Apple to run cross-platform (i.e., on both 
+Central Processing Units [CPUs] and GPUs of any brand). The libraries CuPy 
+and PyOpenCL are used to interface the GPU with the main Python program, 
+and NumPy runs on the CPU.
+
+The dependent variable is the runtime of the simulation. A faster runtime 
+with the GPU indicates a more efficient program, and therefore a 
+successful project.
+
+\section{Methods and Materials}
+\vspace{1pt}\hrule\vspace{12pt}
+
+The computer used in this experiment has an Intel\textsuperscript 
+\textregistered \ Core™ i5-12600K CPU and an Nvidia 
+GeForce\textsuperscript \textregistered \  RTX™ 3090 GPU. The computer 
+has 32 gigabytes of random-access memory (RAM). The Python version is 
+3.10.7, with CuPy 11.3.0, NumPy 1.23.3, and PyOpenCL 2022.3.1 installed 
+with dependencies.
+
+Four primary test groups were used: NumPy, CuPy, PyOpenCL GPU, and 
+PyOpenCL CPU. The NumPy framework, compiled with the Numba library, ran 
+only on the CPU. CuPy, only compatible with Nvidia GPUs, was GPU-only. 
+PyOpenCL represented the two remaining groups, one on the CPU and one on 
+the GPU. Each group ran for one hundred trials with one iteration per 
+trial. The number of bodies varied from \begin{math}2^{13}\end{math} 
+(8,192) to \begin{math}2^{18}\end{math} (262,144) particles. After running 
+the simulations, the runtime in seconds was recorded to a web server and 
+later analyzed with R, a statistical programming language.
+
+The main Python script, which can be found on 
+GitHub\footnote[2]{http://github.com/ryland-goldman/n-body-simulation}, 
+contains separate sub-programs for each test group. Each iteration runs a 
+nested loop (hence the \begin{math}O(n^2)\end{math} time complexity) which 
+computes the distance between each particle, the resulting gravitational 
+force, and uses trigonometry to update velocity through integrating with 
+small time steps (\cite{trenti_n-body_2008}).
+
+The parameters of the simulation included the number of iterations, the 
+framework to use, and the number of bodies. At the beginning of the run, 
+initial conditions were randomly generated and the code was compiled by 
+the respective library. After completion, the data is compiled into a 
+video animation or interactive plot output. Only the sub-programs were 
+timed.
+
+\section{Results}
+\vspace{1pt}\hrule\vspace{12pt}
+
+\begin{figure}[H]
+\includegraphics[width=11cm]{scatter.png}
+\centering
+\label{fig:scatter}
+\caption{Bodies vs. Runtime (log-log) Scatter Plot}
+\end{figure}
+
+Figure 2 compares the number of bodies used in the simulation, ranging in 
+powers of two from \begin{math}2^{13}\end{math} to 
+\begin{math}2^{18}\end{math}, to the runtime of the simulation. The power 
+regression, or trendline, of the NumPy (CPU-only) group was 
+\begin{math}cx^{2.26}\end{math}, while the CuPy (GPU-only) group was 
+\begin{math}cx^{0.978}\end{math}. 
+
+\begin{figure}[H]
+\includegraphics[width=11cm]{bar.png}
+\centering
+\label{fig:bargraph}
+\caption{Bodies vs. Speedup (log-log) Bar Graph}
+\end{figure}
+
+Figure 3 examines the speedup of using different frameworks as a multiple 
+of the performance increase compared to NumPy. 
+
+Both figures were generated with the Plotly library in R. The error bars 
+represent the 95\% confidence interval using \begin{math}2\times 
+{SE}_{\bar{x}}\end{math}. There was no overlap between the NumPy and CuPy 
+test groups, so the data is likely statistically significant, but no 
+further statistical tests were conducted.
+
+\section{Analysis}
+\vspace{1pt}\hrule\vspace{12pt}
+
+Overall, when the number of bodies is greater than or equal to 
+\begin{math}2^{14}\end{math}, the CuPy group was the fastest. As the 
+number of bodies grew, the speedup over NumPy increased to 38.8x faster 
+with the maximum \begin{math}2^{15}\end{math} bodies.
+
+Unexpectedly, the trendline of the CuPy group was 
+\begin{math}cx^{0.978}\end{math} — since the time complexity is 
+\begin{math}O(n^2)\end{math}, the trendline should be around 
+\begin{math}cx^2\end{math}. Assuming no random or systematic errors, the 
+trendline should approach \begin{math}cx^2\end{math} as the number of 
+bodies increases to infinity. This could mean that there are spare GPU 
+threads available, decreasing the runtime for larger groups which have a 
+higher GPU utilization.
+
+When the number of particles was small (\begin{math}2^{13}\end{math} 
+bodies), the CuPy speed was 0.572x slower than the NumPy speed. Each 
+iteration of the simulation, data is sent from the CPU's random-access 
+memory (RAM) to the GPU's video RAM in order for the necessary 
+computations to take place on the GPU. There is limited bandwidth between 
+the two components, so a latency is expected. When the number of 
+calculations is small, the latency can overtake the benefits of 
+parallelization. This is akin to using a calculator to find the answer to 
+a simple arithmetic problem—the calculator can do the work instantly, but 
+the delay of typing in all of the numbers makes the total process longer 
+than mental math. The breakeven point, where NumPy and CuPy times are 
+roughly equivalent, seems to be just below 16,000 bodies.
+
+The OpenCL groups were a control to more directly compare the CPU and GPU 
+using the same framework. In total, the GPU OpenCL group was consistently 
+faster than the CPU OpenCL group, validating the NumPy/CuPy results. Both 
+OpenCL groups, however, were consistently lower (in all but two test 
+cases) than the native frameworks (NumPy and CuPy). For example, with 
+\begin{math}2^{18}\end{math} bodies, the CuPy speedup was 38.8x compared 
+to the OpenCL GPU speedup of 1.9x. This suggests that using OpenCL 
+provides the benefits of cross-platform portability, enabling it to run on 
+a wide variety of hardware, but comes at the cost of performance. CuPy and 
+NumPy are specifically designed to run optimally on their respective 
+devices. OpenCL does not have that freedom, causing it to run slower 
+across the board.
+
+\section{Conclusion}
+\vspace{1pt}\hrule\vspace{12pt}
+
+For any researcher looking to improve the performance of a computational 
+physics simulation, not limited to \textit{N}-body simulations, this study 
+finds that the CUDA framework is generally the fastest method for a large 
+number of bodies. For smaller simulations, such as orbital predictions 
+limited to less than a few thousand bodies, a CPU-based Python model is 
+likely to give the best performance. While OpenCL benefits from 
+portability, it is better to use the native programming on the respective 
+device in order to achieve optimal performance.
+
+Future studies should address the magnitude at which a Barnes-Hut 
+algorithm decreases the accuracy compared to a particle-particle 
+simulation. Additionally, various compiled languages such as C or C++ 
+should be tested for further potential performance improvements, as well 
+as the trade-offs of techniques like adaptive time stepping (where the 
+integration time steps are varied through machine learning). This 
+project's budget was limited, so only a single CPU and GPU pair was 
+tested. A datacenter or supercomputer is likely to have many devices 
+running concurrently and could be another space for exploration by testing 
+whether the current trends continue as the number of bodies increases.
+
+\nocite{mathias_cbmos:_2022}
+\nocite{lee_boosting_2014}
+\nocite{lai_hybrid_2020}
+
+\vspace{24pt}\hrule\vspace{1pt}\hrule\vspace{12pt}
+
+\printbibliography
+
+\end{document}
