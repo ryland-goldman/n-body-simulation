@@ -20,6 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+do_export <- TRUE
+
 # Load packages
 library(readr)
 library(plotly)
@@ -99,6 +101,8 @@ fig <- layout(fig, yaxis = list(title = list(text="Time (seconds, log scale)",fo
 fig
 
 # Export figure
-export(fig, file = " plot.svg", selenium = RSelenium::rsDriver(browser = "firefox"))
+if(do_export){
+  export(fig, file = " plot.svg", selenium = RSelenium::rsDriver(browser = "firefox"))
+}
 
-# After file is exported, run `svgexport *.svg out.png 8x` to create png
+# After file is exported, run `svgexport *.svg out.png 8x` in terminal to create png
